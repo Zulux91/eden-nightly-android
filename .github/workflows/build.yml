@@ -114,7 +114,7 @@ jobs:
         id: changelog
         run: |
           echo "body<<EOF" >> $GITHUB_OUTPUT
-          cat ~/changelog >> $GITHUB_OUTPUT
+          cat downloaded-artifacts/changelog/changelog >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create Release
