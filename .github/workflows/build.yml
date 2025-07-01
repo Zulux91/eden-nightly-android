@@ -24,7 +24,8 @@ jobs:
 
       - name: Generate changelog
         run: |
-          bash ./changelog.sh
+          chmod +x ./changelog.sh
+          ./changelog.sh > changelog
           echo "BODY<<EOF" >> $GITHUB_ENV
           cat changelog >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
