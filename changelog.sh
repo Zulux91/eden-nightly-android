@@ -21,7 +21,7 @@ echo "$TAG" > ~/tag
 echo "$COUNT" > ~/count
 
 # Setup changelog
-CHANGELOG_FILE=~/changelog
+CHANGELOG_FILE=../changelog
 BASE_COMMIT_URL="https://git.eden-emu.dev/eden-emu/eden/commit"
 
 if [ -z "$OLD_HASH" ]; then
