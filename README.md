@@ -8,6 +8,9 @@
 [![GitHub Downloads](https://img.shields.io/github/downloads/Zulux91/eden-nightly-android/total?logo=github&label=GitHub%20Downloads)](https://github.com/Zulux91/eden-nightly-android/releases/latest)
 [![CI Build Status](https://github.com//Zulux91/eden-nightly-android/actions/workflows/build-nightly.yml/badge.svg)](https://github.com/Zulux91/eden-nightly-android/releases/latest)
 
+> [!NOTE]  
+> This repo is ported from pflyly's [eden-nightly repo](https://github.com/pflyly/eden-nightly).
+
 ## Release Overview
 
 This repository provides **unofficial nightly releases** of **Eden** only for android.
@@ -42,4 +45,3 @@ Using com.miHoYo.Yuanshen for application ID to enable device dependent features
 
 
 ---------------------------------------------------------------
-This repo is ported from pflyly's [eden-nightly repo](https://github.com/pflyly/eden-nightly).
