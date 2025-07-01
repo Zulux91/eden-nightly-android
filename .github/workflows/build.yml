@@ -94,27 +94,21 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: changelog
+          path: downloaded-artifacts
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: eden-android-Replace
+      - name: Read changelog
+        id: changelog
+        run: |
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          cat ~/changelog >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: eden-android-Coexist
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: eden-android-Optimised
-
-      - name: Publish Release
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ env.TAG }}
-          name: "Eden Android Nightly"
+          name: "Eden Unofficial Android Nightly"
           body: ${{ steps.changelog.outputs.body }}
-          files: |
-            eden-android-*/Eden-*-Android-Unofficial-*.apk
+          files: downloaded-artifacts/eden-android-*/Eden-*.apk
