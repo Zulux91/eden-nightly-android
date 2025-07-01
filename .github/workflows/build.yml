@@ -20,11 +20,19 @@ jobs:
           last_release_tag=$(echo "$latest_release_info" | jq -r '.tag_name')
 
           if [ "$last_release_tag" = "null" ] || [ -z "$last_release_tag" ]; then
-            echo "❗ No previous release tag found. Using HEAD hash as OLD_HASH"
+            echo "No previous release tag found. Using HEAD hash as OLD_HASH"
             old_hash=$(git rev-parse --short HEAD)
           else
             echo "Previous tag: $last_release_tag"
-            old_hash="${last_release_tag##*-}"
+            candidate="${last_release_tag##*-}"
+            
+            if git rev-parse --verify "$candidate" >/dev/null 2>&1; then
+              echo "'$candidate' is a valid commit hash"
+              old_hash="$candidate"
+            else
+              echo "'$candidate' is not a valid commit. Falling back to HEAD"
+              old_hash=$(git rev-parse --short HEAD)
+            fi
           fi
 
           echo "OLD_HASH=$old_hash" >> "$GITHUB_ENV"
