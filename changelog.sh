@@ -55,3 +55,4 @@ cp -av eden/. "$SOURCE_NAME"
 ZIP_NAME="$SOURCE_NAME.7z"
 7z a -t7z -mx=9 "$ZIP_NAME" "$SOURCE_NAME"
 mv "$ZIP_NAME" artifacts/
+echo TAG=$TAG >> $GITHUB_ENV
