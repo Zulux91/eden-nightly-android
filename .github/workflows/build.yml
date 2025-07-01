@@ -6,6 +6,9 @@ on:
 jobs:
   info:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.set_tag.outputs.tag }}
+      current_hash: ${{ steps.set_tag.outputs.current_hash }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -51,16 +54,26 @@ jobs:
             fi
           fi
 
-      - name: Generate changelog
+      - name: Generate changelog and set tag
+        id: set_tag
         run: |
           chmod +x ./changelog.sh
           ./changelog.sh
+          
+          # Read the tag from the file created by changelog.sh
+          tag=$(cat tag)
+          current_hash=$(echo "$CURRENT_EDEN_HASH")
+          
+          echo "tag=$tag" >> $GITHUB_OUTPUT
+          echo "current_hash=$current_hash" >> $GITHUB_OUTPUT
 
       - name: Upload changelog
         uses: actions/upload-artifact@v4
         with:
           name: changelog
-          path: changelog
+          path: |
+            changelog
+            tag
 
   android:
     needs: info
@@ -119,7 +132,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ env.TAG }}
+          tag_name: ${{ needs.info.outputs.tag }}
           name: "Eden Unofficial Android Nightly"
           body: ${{ steps.changelog.outputs.body }}
           files: downloaded-artifacts/eden-android-*/Eden-*.apk
