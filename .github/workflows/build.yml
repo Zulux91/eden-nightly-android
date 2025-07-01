@@ -1,0 +1,102 @@
+name: Build Eden Android
+
+on:
+  workflow_dispatch:
+
+jobs:
+  info:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Get latest tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          api="https://api.github.com/repos/${{ github.repository }}"
+          latest=$(curl -sH "Authorization: token $GH_TOKEN" "$api/releases/latest" | jq -r '.tag_name')
+          echo "TAG=$latest" >> $GITHUB_ENV
+
+      - name: Generate changelog
+        run: |
+          chmod +x ./changelog.sh
+          ./changelog.sh > changelog
+          echo "BODY<<EOF" >> $GITHUB_ENV
+          cat changelog >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Upload changelog
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog
+          path: changelog
+
+  android:
+    needs: info
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [Replace, Coexist, Optimised]
+    env:
+      TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y glslang-tools libvulkan-dev
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - uses: android-actions/setup-android@v2
+
+      - name: Compile Eden Android (${{ matrix.target }})
+        run: |
+          chmod +x ./eden-android.sh
+          ./eden-android.sh
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: eden-android-${{ matrix.target }}
+          path: eden/src/android/artifacts/
+
+  release:
+    needs: [info, android]
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: changelog
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: eden-android-Replace
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: eden-android-Coexist
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: eden-android-Optimised
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ env.TAG }}
+          name: "Eden Android Nightly"
+          body: ${{ env.BODY }}
+          files: |
+            eden-android-*/Eden-*-Android-Unofficial-*.apk
