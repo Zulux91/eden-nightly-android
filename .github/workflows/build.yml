@@ -15,20 +15,20 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-            api_url="https://api.github.com/repos/${{ github.repository }}"
-            latest_release_info=$(curl -H "Authorization: token $GH_TOKEN" "$api_url/releases/latest")
-            last_release_tag=$(echo "$latest_release_info" | jq -r '.tag_name')
-            echo "${last_release_tag}"
-            old_hash="${last_release_tag##*-}"
-            echo "OLD_HASH=$old_hash" >> "$GITHUB_ENV"
+          api_url="https://api.github.com/repos/${{ github.repository }}"
+          latest_release_info=$(curl -H "Authorization: token $GH_TOKEN" "$api_url/releases/latest")
+          last_release_tag=$(echo "$latest_release_info" | jq -r '.tag_name')
+          echo "${last_release_tag}"
+          old_hash="${last_release_tag##*-}"
+          echo "OLD_HASH=$old_hash" >> "$GITHUB_ENV"
 
       - name: Generate changelog
         run: |
           chmod +x ./changelog.sh
-          ./changelog.sh > changelog
-          echo "BODY<<EOF" >> $GITHUB_ENV
-          cat changelog >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+          ./changelog.sh
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          cat ~/changelog >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Upload changelog
         uses: actions/upload-artifact@v4
@@ -100,6 +100,6 @@ jobs:
         with:
           tag_name: ${{ env.TAG }}
           name: "Eden Android Nightly"
-          body: ${{ env.BODY }}
+          body: ${{ steps.changelog.outputs.body }}
           files: |
             eden-android-*/Eden-*-Android-Unofficial-*.apk
