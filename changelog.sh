@@ -17,8 +17,8 @@ DATE="$(date +"%Y-%m-%d")"
 HASH="$(git rev-parse --short HEAD)"
 TAG="${DATE}-${HASH}"
 SOURCE_NAME="Eden-${COUNT}-Source-Code"
-echo "$TAG" > ~/tag
-echo "$COUNT" > ~/count
+echo "$TAG" > ../tag
+echo "$COUNT" > ../count
 
 # Setup changelog
 CHANGELOG_FILE=../changelog
