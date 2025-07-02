@@ -1,138 +1,153 @@
-name: Build Eden Android
+name: Build Eden Nightly
+concurrency:
+  group: build-eden-nightly-${{ github.ref }}
+  cancel-in-progress: true
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 jobs:
   info:
     runs-on: ubuntu-latest
-    outputs:
-      tag: ${{ steps.set_tag.outputs.tag }}
-      current_hash: ${{ steps.set_tag.outputs.current_hash }}
+    name: "Get info"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
         with:
           persist-credentials: false
 
-      - name: Clone Eden and get hash info
+      - name: Get the latest release tag
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
         run: |
-          # Clone Eden repo to get proper hash
-          if ! git clone 'https://git.eden-emu.dev/eden-emu/eden.git' ./eden; then
-            echo "Using mirror instead..."
-            rm -rf ./eden || true
-            git clone 'https://github.com/pflyly/eden-mirror.git' ./eden
-          fi
-          cd ./eden
-          
-          # Get current hash from eden repo
-          current_hash=$(git rev-parse --short HEAD)
-          echo "CURRENT_EDEN_HASH=$current_hash" >> "$GITHUB_ENV"
-          
-          # Try to get previous release tag from THIS workflow repo
-          cd ..
           api_url="https://api.github.com/repos/${{ github.repository }}"
-          latest_release_info=$(curl -sH "Authorization: token $GH_TOKEN" "$api_url/releases/latest")
+          latest_release_info=$(curl -H "Authorization: token $GH_TOKEN" "$api_url/releases/latest")
           last_release_tag=$(echo "$latest_release_info" | jq -r '.tag_name')
+          echo "${last_release_tag}"
+          old_hash="${last_release_tag##*-}"
+          echo "OLD_HASH=$old_hash" >> "$GITHUB_ENV"
 
-          if [ "$last_release_tag" = "null" ] || [ -z "$last_release_tag" ]; then
-            echo "No previous release tag found. Using current eden hash as OLD_HASH"
-            echo "OLD_HASH=$current_hash" >> "$GITHUB_ENV"
-          else
-            echo "Previous tag: $last_release_tag"
-            # Extract hash from tag format: YYYY-MM-DD-hash
-            candidate="${last_release_tag##*-}"
-            
-            cd ./eden
-            if git rev-parse --verify "$candidate" >/dev/null 2>&1; then
-              echo "'$candidate' is a valid commit hash in eden repo"
-              echo "OLD_HASH=$candidate" >> "$GITHUB_ENV"
-            else
-              echo "'$candidate' is not a valid commit in eden repo. Using current hash"
-              echo "OLD_HASH=$current_hash" >> "$GITHUB_ENV"
-            fi
-          fi
-
-      - name: Generate changelog and set tag
-        id: set_tag
+      - name: Generate changelog
         run: |
           chmod +x ./changelog.sh
           ./changelog.sh
-          
-          # Read the tag from the file created by changelog.sh
-          tag=$(cat tag)
-          current_hash=$(echo "$CURRENT_EDEN_HASH")
-          
-          echo "tag=$tag" >> $GITHUB_OUTPUT
-          echo "current_hash=$current_hash" >> $GITHUB_OUTPUT
 
-      - name: Upload changelog
-        uses: actions/upload-artifact@v4
+      - name: Upload tag file
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: tag
+          path: ~/tag
+
+      - name: Upload count file
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: count
+          path: ~/count
+
+      - name: Upload changelog file
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: changelog
-          path: |
-            changelog
-            tag
+          path: ~/changelog
+
+      - name: Upload source code
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: source
+          path: artifacts
 
   android:
-    needs: info
     runs-on: ubuntu-latest
     strategy:
       matrix:
         target: [Replace, Coexist, Optimised]
+    continue-on-error: true
+    name: "Android (${{ matrix.target }})"
     env:
       TARGET: ${{ matrix.target }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
 
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y glslang-tools libvulkan-dev
+          sudo apt-get install glslang-tools libvulkan-dev -y
 
-      - uses: actions/setup-java@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
         with:
-          distribution: temurin
+          distribution: "temurin"
           java-version: 17
 
-      - uses: gradle/actions/setup-gradle@v4
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
 
-      - uses: android-actions/setup-android@v2
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v2
 
-      - name: Compile Eden Android (${{ matrix.target }})
+      - name: Compile Eden android
         run: |
           chmod +x ./eden-android.sh
           ./eden-android.sh
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: eden-android-${{ matrix.target }}
           path: eden/src/android/artifacts/
 
   release:
+    name: "release"
+    if: ${{ github.ref_name == 'main' }}
     needs: [info, android]
-    if: github.ref_name == 'main'
+    permissions:
+      actions: read
+      security-events: write
+      contents: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4.3.0
         with:
-          path: downloaded-artifacts
+          name: eden-android-Replace
 
-      - name: Read changelog
-        id: changelog
+      - uses: actions/download-artifact@v4.3.0
+        with:
+          name: eden-android-Coexist
+
+      - uses: actions/download-artifact@v4.3.0
+        with:
+          name: tag
+
+      - uses: actions/download-artifact@v4.3.0
+        with:
+          name: count
+
+      - uses: actions/download-artifact@v4.3.0
+        with:
+          name: changelog
+
+      - uses: actions/download-artifact@v4.3.0
+        with:
+          name: source
+
+      - name: Generate changelog
         run: |
-          echo "body<<EOF" >> $GITHUB_OUTPUT
-          cat downloaded-artifacts/changelog/changelog >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "TAG=$(cat tag)" >> "${GITHUB_ENV}"
+          echo "COUNT=$(cat count)" >> "${GITHUB_ENV}"
+          echo "BODY<<EOF" >> "${GITHUB_ENV}"
+          cat changelog >> "${GITHUB_ENV}"
+          echo "EOF" >> "${GITHUB_ENV}"
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Release Eden
+        uses: softprops/action-gh-release@v2.2.2
         with:
-          tag_name: ${{ needs.info.outputs.tag }}
-          name: "Eden Unofficial Android Nightly"
-          body: ${{ steps.changelog.outputs.body }}
-          files: downloaded-artifacts/eden-android-*/Eden-*.apk
+          name: "Eden Unofficial Nightly Release: ${{ env.COUNT }}"
+          tag_name: "${{ env.TAG }}"
+          body: "${{ env.BODY }}"
+          prerelease: false
+          draft: false
+          generate_release_notes: false
+          fail_on_unmatched_files: false
+          make_latest: true
+          files: |
+            *.apk
