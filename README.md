@@ -9,7 +9,7 @@
 [![CI Build Status](https://github.com//Zulux91/eden-nightly-android/actions/workflows/build.yml/badge.svg)](https://github.com/Zulux91/eden-nightly-android/releases/latest)
 
 > [!NOTE]  
-> This repo is ported from pflyly's [eden-nightly repo](https://github.com/pflyly/eden-nightly).
+> This repo uses the code from pflyly's [eden-nightly repo](https://github.com/pflyly/eden-nightly).
 
 ## Release Overview
 
