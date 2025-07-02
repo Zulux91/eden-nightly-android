@@ -28,7 +28,7 @@ BASE_COMPARE_URL="https://git.eden-emu.dev/eden-emu/eden/compare"
 BASE_DOWNLOAD_URL="https://github.com/Zulux91/eden-nightly-android/releases/download"
 
 # Fallback if OLD_HASH is empty or null
-if [ -z "$OLD_HASH" ]; then
+if [ -z "$OLD_HASH" ] || [ "$OLD_HASH" = "null" ]; then
   echo "OLD_HASH is empty, falling back to current HASH"
   OLD_HASH="$HASH"
 fi
