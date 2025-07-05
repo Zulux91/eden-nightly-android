@@ -64,27 +64,51 @@ jobs:
     name: "Android (${{ matrix.target }})"
     env:
       TARGET: ${{ matrix.target }}
+
     steps:
       - uses: actions/checkout@v4.2.2
 
       - name: Install dependencies
         run: |
-          sudo apt-get install glslang-tools libvulkan-dev -y
-
+          sudo apt-get install sccache glslang-tools libvulkan-dev -y
+          
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: "temurin"
+          distribution: 'temurin'
           java-version: 17
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          cache-read-only: false
-
+          
       - name: Set up Android SDK
         uses: android-actions/setup-android@v2
+        
+      - name: Pull Eden with submodules
+        run: |
+          if ! git clone 'https://git.eden-emu.dev/eden-emu/eden.git' ./eden; then
+            echo "Using mirror instead..."
+            rm -rf ./eden || true
+            git clone 'https://github.com/pflyly/eden-mirror.git' ./eden
+          fi
+          cd ./eden
+          git submodule update --init --recursive
+          
+      - name: setup cache for ${{ matrix.target }}
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ matrix.target }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-${{ matrix.target }}-
 
+      - name: Set up sccache for ${{ matrix.target }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/sccache/
+          key: ${{ runner.os }}-android-sccache-${{ matrix.target }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-android-sccache-${{ matrix.target }}-
+            
       - name: Compile Eden android
         run: |
           chmod +x ./eden-android.sh

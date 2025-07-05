@@ -1,20 +1,22 @@
 #!/bin/bash -ex
 
-# Clone Eden, fallback to mirror if upstream repo fails to clone
-if ! git clone 'https://git.eden-emu.dev/eden-emu/eden.git' ./eden; then
-	echo "Using mirror instead..."
-	rm -rf ./eden || true
-	git clone 'https://github.com/pflyly/eden-mirror.git' ./eden
-fi
+export NDK_CCACHE=$(which sccache)
 
 cd ./eden
-git submodule update --init --recursive
 
 # workaround for prebuilt ffmpeg download failure
 # use prebuilt ffmpeg from https://git.eden-emu.dev/eden-emu/ext-android-bin
 # content unchanged
 sed -i 's|set(package_base_url "https://git.eden-emu.dev/eden-emu/")|set(package_base_url "https://github.com/pflyly/eden-nightly/")|' CMakeModules/DownloadExternals.cmake
 sed -i 's|set(package_repo "ext-android-bin/raw/master/")|set(package_repo "raw/refs/heads/main/")|' CMakeModules/DownloadExternals.cmake
+
+# don't build tests and build real release type
+sed -i '/"-DYUZU_ENABLE_LTO=ON"/a\
+                    "-DCMAKE_BUILD_TYPE=Release",\
+                    "-DCMAKE_C_COMPILER_LAUNCHER=sccache",\
+                    "-DCMAKE_CXX_COMPILER_LAUNCHER=sccache",\
+                    "-DYUZU_TESTS=OFF",
+' src/android/app/build.gradle.kts
 
 if [ "$TARGET" = "Coexist" ]; then
     # Change the App name and application ID to make it coexist with official build
@@ -35,10 +37,12 @@ APK_NAME="Eden-${COUNT}-Android-Unofficial-${TARGET}"
 cd src/android
 chmod +x ./gradlew
 if [ "$TARGET" = "Optimised" ]; then
-	./gradlew assembleGenshinSpoofRelease --console=plain --info -Dorg.gradle.caching=true
+	./gradlew assembleGenshinSpoofRelease --build-cache --parallel --console=plain --info
 else
-	./gradlew assembleMainlineRelease --console=plain --info -Dorg.gradle.caching=true
+	./gradlew assembleMainlineRelease --build-cache --parallel --console=plain --info
 fi
+
+sccache -s
 
 APK_PATH=$(find app/build/outputs/apk -type f -name "*.apk" | head -n 1)
 if [ -z "$APK_PATH" ]; then
