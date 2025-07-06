@@ -91,8 +91,9 @@ jobs:
           cd ./eden
           git submodule update --init --recursive
           
-      - name: setup cache for ${{ matrix.target }}
-        uses: actions/cache@v4
+      - name: Restore gradle cache for ${{ matrix.target }}
+        uses: actions/cache/restore@v4
+        id: restore-gradle-cache
         with:
           path: |
             ~/.gradle/caches
@@ -101,8 +102,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-${{ matrix.target }}-
 
-      - name: Set up sccache for ${{ matrix.target }}
-        uses: actions/cache@v4
+      - name: Restore sccache for ${{ matrix.target }}
+        uses: actions/cache/restore@v4
+        id: restore-sccache-cache
         with:
           path: ~/.cache/sccache/
           key: ${{ runner.os }}-android-sccache-${{ matrix.target }}-${{ github.sha }}
@@ -119,6 +121,22 @@ jobs:
         with:
           name: eden-android-${{ matrix.target }}
           path: eden/src/android/artifacts/
+        
+      - name: Save gradle cache for ${{ matrix.target }}
+        if: ${{ github.ref_name == 'main' }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ steps.restore-gradle-cache.outputs.cache-primary-key }}
+
+      - name: Save sccache for ${{ matrix.target }}
+        if: ${{ github.ref_name == 'main' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/sccache/
+          key: ${{ steps.restore-sccache-cache.outputs.cache-primary-key }}
 
   release:
     name: "release"
