@@ -10,6 +10,26 @@
 
 > [!NOTE]  
 > This repo uses the code from pflyly's [eden-nightly repo](https://github.com/pflyly/eden-nightly).
+---------------------------------------------------------------
+## How to add this version to your ES-DE instance
+Assuming you already have custom systems do this:
+- Search for `EDEN` in your `es_find_rules.xml` file.
+- Above `<emulator name="EDEN">` paste: 
+```xml
+<emulator name="EDEN-NIGHTLY">
+		<!-- Nintendo Switch emulator Eden Nightly build -->
+		<rule type="androidpackage">			
+			<entry>dev.eden.eden_emulator.nightly/org.yuzu.yuzu_emu.activities.EmulationActivity</entry>
+		</rule>
+	</emulator>
+```
+- Save the changes.
+- Then in your `es_systems.xml` file search for `Eden (Standalone)`.
+- Make a new line below the string you just searched and paste:
+```xml
+<command label="Eden (Standalone-Nightly)">%EMULATOR_EDEN-NIGHTLY% %ACTION%=android.nfc.action.TECH_DISCOVERED %DATA%=%ROMPROVIDER%</command>
+```
+- Save the changes and you're good to go.
 
 ## Release Overview
 
