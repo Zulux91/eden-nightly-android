@@ -24,7 +24,7 @@ echo "$COUNT" > ~/count
 # Start to generate release info and changelog
 CHANGELOG_FILE=~/changelog
 BASE_COMMIT_URL="https://git.eden-emu.dev/eden-emu/eden/commit"
-BASE_COMPARE_URL="https://git.eden-emu.dev/eden-emu/eden/compare"
+BASE_COMPARE_URL="https://github.com/pflyly/eden-mirror/compare"
 BASE_DOWNLOAD_URL="https://github.com/Zulux91/eden-nightly-android/releases/download"
 
 # Fallback if OLD_HASH is empty or null
