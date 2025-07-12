@@ -63,7 +63,7 @@ echo >> "$CHANGELOG_FILE"
 # Generate release table
 echo "## Unofficial Nightly Release: ${COUNT}" >> "$CHANGELOG_FILE"
 echo "| Platform | Target / Arch |" >> "$CHANGELOG_FILE"
-echo "|--|--|--|" >> "$CHANGELOG_FILE"
+echo "|--|--|" >> "$CHANGELOG_FILE"
 echo "| Android | [\`Coexist\`](${BASE_DOWNLOAD_URL}/${TAG}/Eden-${COUNT}-Android-Unofficial-Coexist.apk)<br><br>[\`Replace\`](${BASE_DOWNLOAD_URL}/${TAG}/Eden-${COUNT}-Android-Unofficial-Replace.apk)<br><br>[\`Optimised\`](${BASE_DOWNLOAD_URL}/${TAG}/Eden-${COUNT}-Android-Unofficial-Optimised.apk) |" >> "$CHANGELOG_FILE"
 echo "| Any | [Source Code](${BASE_DOWNLOAD_URL}/${TAG}/Eden-${COUNT}-Source-Code.7z) |" >> "$CHANGELOG_FILE"
 
