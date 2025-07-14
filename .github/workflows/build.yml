@@ -10,6 +10,9 @@ jobs:
   info:
     runs-on: ubuntu-latest
     name: "Get info"
+    strategy:
+      matrix:
+        target: [Info]
     steps:
       - uses: actions/checkout@v4.2.2
         with:
