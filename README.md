@@ -11,7 +11,7 @@
 > [!NOTE]  
 > This repo uses the code from pflyly's [eden-nightly repo](https://github.com/pflyly/eden-nightly).
 ---------------------------------------------------------------
-## How to add this version to your ES-DE instance
+## How to add the Coexist version to your ES-DE instance
 Assuming you already have custom systems do this:
 - Search for `EDEN` in your `es_find_rules.xml` file.
 - Above `<emulator name="EDEN">` paste: 
