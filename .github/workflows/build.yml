@@ -94,16 +94,16 @@ jobs:
           cd ./eden
           git submodule update --init --recursive
           
-      - name: Restore gradle cache for ${{ matrix.target }}
-        uses: actions/cache/restore@v4
-        id: restore-gradle-cache
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ matrix.target }}-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-${{ matrix.target }}-
+#      - name: Restore gradle cache for ${{ matrix.target }}
+#        uses: actions/cache/restore@v4
+#        id: restore-gradle-cache
+#        with:
+#          path: |
+#            ~/.gradle/caches
+#            ~/.gradle/wrapper
+#          key: ${{ runner.os }}-gradle-${{ matrix.target }}-${{ github.sha }}
+#          restore-keys: |
+#            ${{ runner.os }}-gradle-${{ matrix.target }}-
 
       - name: Restore sccache for ${{ matrix.target }}
         uses: actions/cache/restore@v4

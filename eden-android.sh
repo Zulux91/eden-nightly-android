@@ -31,9 +31,9 @@ APK_NAME="Eden-${COUNT}-Android-Unofficial-${TARGET}"
 cd src/android
 chmod +x ./gradlew
 if [ "$TARGET" = "Optimised" ]; then
-	./gradlew assembleGenshinSpoofRelease --build-cache --parallel --console=plain --info
+	./gradlew assembleGenshinSpoofRelease --parallel --console=plain --info
 else
-	./gradlew assembleMainlineRelease --build-cache --parallel --console=plain --info
+	./gradlew assembleMainlineRelease --parallel --console=plain --info
 fi
 
 sccache -s
