@@ -18,7 +18,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Get the latest release tag
+      - name: Get the latest release count
         env:
           GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
         run: |
@@ -26,8 +26,8 @@ jobs:
           latest_release_info=$(curl -H "Authorization: token $GH_TOKEN" "$api_url/releases/latest")
           last_release_tag=$(echo "$latest_release_info" | jq -r '.tag_name')
           echo "${last_release_tag}"
-          old_hash="${last_release_tag##*-}"
-          echo "OLD_HASH=$old_hash" >> "$GITHUB_ENV"
+          old_count="${last_release_tag##*-}"
+          echo "OLD_COUNT=$old_count" >> "$GITHUB_ENV"
 
       - name: Generate changelog
         run: |
