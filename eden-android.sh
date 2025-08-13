@@ -4,38 +4,44 @@ export NDK_CCACHE=$(which sccache)
 
 cd ./eden
 
-# --- BEGIN: Pin de CMake desde el script (sin tocar Gradle/CI) ---
-: "${ANDROID_SDK_ROOT:=${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
-SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+# --- BEGIN: CMake moderno y local.properties en el lugar correcto ---
+set -euo pipefail
 
-# Instalar CMake 3.27.2 (silencioso) y aceptar licencias
-if [ -x "$SDKMANAGER" ]; then
-    yes | "$SDKMANAGER" "cmake;3.27.2" >/dev/null || true
-    yes | "$SDKMANAGER" --licenses >/dev/null || true
+ANDROID_PROJECT_DIR="src/android"  # raíz del proyecto Android
+
+# 1) Instalar CMake moderno por pip (y ninja como apoyo)
+python3 -m pip install --user --upgrade "cmake==3.27.9" "ninja==1.11.1"
+
+# 2) Detectar la ruta raíz para cmake.dir (carpeta que contiene 'bin/')
+PY_CMAKE_DIR="$(python3 - <<'PY'
+import cmake, os
+bin_dir = os.path.dirname(cmake.cmake_path)      # .../cmake/data/bin
+root_dir = os.path.dirname(bin_dir)              # .../cmake/data
+print(root_dir)
+PY
+)"
+
+# 3) (Opcional) Garantizar que haya un 'ninja' accesible en esa CMake
+if command -v ninja >/dev/null 2>&1; then
+    mkdir -p "${PY_CMAKE_DIR}/bin"
+    ln -sfn "$(command -v ninja)" "${PY_CMAKE_DIR}/bin/ninja" || true
 fi
 
-CMAKE_DIR="$ANDROID_SDK_ROOT/cmake/3.27.2"
-
-# Forzar a Gradle/AGP a usar esa CMake mediante local.properties
-# (se crea/actualiza en tiempo de ejecución, no modifica el repo)
-if [ -d "$CMAKE_DIR" ]; then
-    if [ -f local.properties ]; then
-        if grep -q '^cmake\.dir=' local.properties; then
-            sed -i "s|^cmake\.dir=.*|cmake.dir=$CMAKE_DIR|" local.properties
-        else
-            echo "cmake.dir=$CMAKE_DIR" >> local.properties
-        fi
+# 4) Escribir/actualizar local.properties en la RAÍZ del proyecto Android
+LP="${ANDROID_PROJECT_DIR}/local.properties"
+if [ -f "${LP}" ]; then
+    if grep -q '^cmake\.dir=' "${LP}"; then
+        sed -i "s|^cmake\.dir=.*|cmake.dir=${PY_CMAKE_DIR}|" "${LP}"
     else
-        echo "cmake.dir=$CMAKE_DIR" > local.properties
+        echo "cmake.dir=${PY_CMAKE_DIR}" >> "${LP}"
     fi
 else
-    echo "ADVERTENCIA: No se encontró $CMAKE_DIR; se intentará con la CMake por defecto del SDK."
+    echo "cmake.dir=${PY_CMAKE_DIR}" > "${LP}"
 fi
 
-# (Opcional, sólo si siguiera insistiendo en 3.22.1)
-# ln -sfn "$CMAKE_DIR" "$ANDROID_SDK_ROOT/cmake/3.22.1" || true
-# --- END: Pin de CMake ---
-
+echo "cmake.dir apuntando a: ${PY_CMAKE_DIR}"
+"${PY_CMAKE_DIR}/bin/cmake" --version || true
+# --- END ---
 
 # don't build tests and build real release type
 sed -i '/"-DYUZU_ENABLE_LTO=ON"/a\
