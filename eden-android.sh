@@ -44,6 +44,11 @@ else
     echo "cmake.dir=${PY_CMAKE_DIR}" > "${LP}"
 fi
 
+# justo después de calcular/mostrar la versión de CMake
+VCPKG_LOCAL="$(pwd)/.deps/vcpkg"
+rm -rf "$VCPKG_LOCAL"
+git clone --depth=1 https://github.com/microsoft/vcpkg.git "$VCPKG_LOCAL"
+
 echo "cmake.dir apuntando a: ${PY_CMAKE_DIR}"
 "${PY_CMAKE_DIR}/bin/cmake" --version || true
 mkdir -p "${ANDROID_SDK_ROOT}/cmake"
@@ -54,6 +59,12 @@ ln -sfn "${PY_CMAKE_DIR}" "${ANDROID_SDK_ROOT}/cmake/3.22.1"
 sed -i '/"-DYUZU_ENABLE_LTO=ON"/a\
                     "-DCMAKE_C_COMPILER_LAUNCHER=sccache",\
                     "-DCMAKE_CXX_COMPILER_LAUNCHER=sccache",
+' src/android/app/build.gradle.kts
+
+sed -i '/"-DCMAKE_CXX_COMPILER_LAUNCHER=sccache",/a\
+                    "-DCPM_vcpkg_SOURCE='"$VCPKG_LOCAL"'",\
+                    "-Dvcpkg_SOURCE='"$VCPKG_LOCAL"'",\
+                    "-Dvcpkg_SOURCE_DIR='"$VCPKG_LOCAL"'",\
 ' src/android/app/build.gradle.kts
 
 if [ "$TARGET" = "Coexist" ]; then
