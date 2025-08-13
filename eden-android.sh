@@ -25,7 +25,7 @@ if [ -z "${PY_CMAKE_DIR:-}" ]; then
     exit 1
 fi
 
-# 3) (Opcional) Garantizar que haya un 'ninja' accesible en esa CMake
+# 3) Garantizar que haya un 'ninja' accesible en esa CMake
 mkdir -p "${PY_CMAKE_DIR}/bin"
 USER_BIN="$(python3 -c 'import site, os; print(os.path.join(site.getuserbase(), "bin"))')"
 if [ -x "${USER_BIN}/ninja" ]; then
@@ -44,37 +44,44 @@ else
     echo "cmake.dir=${PY_CMAKE_DIR}" > "${LP}"
 fi
 
-# justo después de calcular/mostrar la versión de CMake
+# 5) Clonar vcpkg (sin shallow) y fijarlo como fuente local para CPM/FetchContent
 VCPKG_LOCAL="$(pwd)/.deps/vcpkg"
 rm -rf "$VCPKG_LOCAL"
-git clone --depth=1 https://github.com/microsoft/vcpkg.git "$VCPKG_LOCAL"
+mkdir -p "$(dirname "$VCPKG_LOCAL")"
+git clone https://github.com/microsoft/vcpkg.git "$VCPKG_LOCAL"
 
 echo "cmake.dir apuntando a: ${PY_CMAKE_DIR}"
 "${PY_CMAKE_DIR}/bin/cmake" --version || true
+
+# Symlink para redirigir cualquier intento rígido a /cmake/3.22.1 hacia la CMake nueva
 mkdir -p "${ANDROID_SDK_ROOT}/cmake"
 ln -sfn "${PY_CMAKE_DIR}" "${ANDROID_SDK_ROOT}/cmake/3.22.1"
 # --- END ---
 
-# don't build tests and build real release type
+# Añadir sccache a los args de CMake en Gradle
 sed -i '/"-DYUZU_ENABLE_LTO=ON"/a\
                     "-DCMAKE_C_COMPILER_LAUNCHER=sccache",\
-                    "-DCMAKE_CXX_COMPILER_LAUNCHER=sccache",
+                    "-DCMAKE_CXX_COMPILER_LAUNCHER=sccache",\
 ' src/android/app/build.gradle.kts
 
+# Forzar uso de la copia local de vcpkg en los args de CMake
 sed -i '/"-DCMAKE_CXX_COMPILER_LAUNCHER=sccache",/a\
                     "-DCPM_vcpkg_SOURCE='"$VCPKG_LOCAL"'",\
                     "-Dvcpkg_SOURCE='"$VCPKG_LOCAL"'",\
                     "-Dvcpkg_SOURCE_DIR='"$VCPKG_LOCAL"'",\
 ' src/android/app/build.gradle.kts
 
-if [ "$TARGET" = "Coexist" ]; then
+# Valor por defecto seguro para TARGET (evita error con 'set -u')
+: "${TARGET:=Mainline}"
+
+if [ "${TARGET:-}" = "Coexist" ]; then
     # Change the App name and application ID to make it coexist with official build
     sed -i 's/applicationId = "dev\.eden\.eden_emulator"/applicationId = "dev.eden.eden_emulator.nightly"/' src/android/app/build.gradle.kts
     sed -i 's/resValue("string", "app_name_suffixed", "Eden")/resValue("string", "app_name_suffixed", "Eden Nightly")/' src/android/app/build.gradle.kts
     sed -i 's|<string name="app_name"[^>]*>.*</string>|<string name="app_name" translatable="false">Eden Nightly</string>|' src/android/app/src/main/res/values/strings.xml
 fi        
 
-if [ "$TARGET" = "Optimised" ]; then
+if [ "${TARGET:-}" = "Optimised" ]; then
     # Add optimised to the app home screen
     sed -i 's/resValue("string", "app_name_suffixed", "Eden")/resValue("string", "app_name_suffixed", "Eden Optimised")/' src/android/app/build.gradle.kts
     sed -i 's|<string name="app_name"[^>]*>.*</string>|<string name="app_name" translatable="false">Eden Optimised</string>|' src/android/app/src/main/res/values/strings.xml
@@ -84,11 +91,12 @@ COUNT="$(git rev-list --count HEAD)"
 APK_NAME="Eden-${COUNT}-Android-Unofficial-${TARGET}"
 
 cd src/android
+echo "Usando local.properties en: $(pwd)/local.properties"
 chmod +x ./gradlew
-if [ "$TARGET" = "Optimised" ]; then
-	./gradlew assembleGenshinSpoofRelease --parallel --console=plain --info
+if [ "${TARGET:-}" = "Optimised" ]; then
+    ./gradlew assembleGenshinSpoofRelease --parallel --console=plain --info
 else
-	./gradlew assembleMainlineRelease --parallel --console=plain --info
+    ./gradlew assembleMainlineRelease --parallel --console=plain --info
 fi
 
 sccache -s
