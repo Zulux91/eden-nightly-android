@@ -14,17 +14,22 @@ python3 -m pip install --user --upgrade "cmake==3.27.9" "ninja==1.11.1"
 
 # 2) Detectar la ruta raíz para cmake.dir (carpeta que contiene 'bin/')
 PY_CMAKE_DIR="$(python3 - <<'PY'
-import cmake, os
-bin_dir = os.path.dirname(cmake.cmake_path)      # .../cmake/data/bin
-root_dir = os.path.dirname(bin_dir)              # .../cmake/data
-print(root_dir)
+import os, cmake
+# El binario queda en <site-packages>/cmake/data/bin/cmake
+print(os.path.join(os.path.dirname(cmake.__file__), "data"))
 PY
 )"
 
+if [ -z "${PY_CMAKE_DIR:-}" ]; then
+    echo "No se pudo localizar la CMake instalada por pip" >&2
+    exit 1
+fi
+
 # 3) (Opcional) Garantizar que haya un 'ninja' accesible en esa CMake
-if command -v ninja >/dev/null 2>&1; then
-    mkdir -p "${PY_CMAKE_DIR}/bin"
-    ln -sfn "$(command -v ninja)" "${PY_CMAKE_DIR}/bin/ninja" || true
+mkdir -p "${PY_CMAKE_DIR}/bin"
+USER_BIN="$(python3 -c 'import site, os; print(os.path.join(site.getuserbase(), "bin"))')"
+if [ -x "${USER_BIN}/ninja" ]; then
+    ln -sfn "${USER_BIN}/ninja" "${PY_CMAKE_DIR}/bin/ninja"
 fi
 
 # 4) Escribir/actualizar local.properties en la RAÍZ del proyecto Android
@@ -41,6 +46,8 @@ fi
 
 echo "cmake.dir apuntando a: ${PY_CMAKE_DIR}"
 "${PY_CMAKE_DIR}/bin/cmake" --version || true
+mkdir -p "${ANDROID_SDK_ROOT}/cmake"
+ln -sfn "${PY_CMAKE_DIR}" "${ANDROID_SDK_ROOT}/cmake/3.22.1"
 # --- END ---
 
 # don't build tests and build real release type
