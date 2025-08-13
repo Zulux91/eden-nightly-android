@@ -4,6 +4,39 @@ export NDK_CCACHE=$(which sccache)
 
 cd ./eden
 
+# --- BEGIN: Pin de CMake desde el script (sin tocar Gradle/CI) ---
+: "${ANDROID_SDK_ROOT:=${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+
+# Instalar CMake 3.27.2 (silencioso) y aceptar licencias
+if [ -x "$SDKMANAGER" ]; then
+    yes | "$SDKMANAGER" "cmake;3.27.2" >/dev/null || true
+    yes | "$SDKMANAGER" --licenses >/dev/null || true
+fi
+
+CMAKE_DIR="$ANDROID_SDK_ROOT/cmake/3.27.2"
+
+# Forzar a Gradle/AGP a usar esa CMake mediante local.properties
+# (se crea/actualiza en tiempo de ejecución, no modifica el repo)
+if [ -d "$CMAKE_DIR" ]; then
+    if [ -f local.properties ]; then
+        if grep -q '^cmake\.dir=' local.properties; then
+            sed -i "s|^cmake\.dir=.*|cmake.dir=$CMAKE_DIR|" local.properties
+        else
+            echo "cmake.dir=$CMAKE_DIR" >> local.properties
+        fi
+    else
+        echo "cmake.dir=$CMAKE_DIR" > local.properties
+    fi
+else
+    echo "ADVERTENCIA: No se encontró $CMAKE_DIR; se intentará con la CMake por defecto del SDK."
+fi
+
+# (Opcional, sólo si siguiera insistiendo en 3.22.1)
+# ln -sfn "$CMAKE_DIR" "$ANDROID_SDK_ROOT/cmake/3.22.1" || true
+# --- END: Pin de CMake ---
+
+
 # don't build tests and build real release type
 sed -i '/"-DYUZU_ENABLE_LTO=ON"/a\
                     "-DCMAKE_C_COMPILER_LAUNCHER=sccache",\
