@@ -54,9 +54,8 @@ git log --reverse --pretty=format:"%H %s" "${OLD_HASH}..HEAD" | while IFS= read 
   i=$((i + 1))
 done
 
-# Add full changelog from lastest official tag release (temp fix with 0.0.2-pre-alpha tag)
-# RELEASE_TAG="$(git describe --tags | awk -F'-' '{print $1 "-" $2 "-" $3}')"
-echo "Full Changelog: [\`0.0.2-pre-alpha...master\`](${BASE_COMPARE_URL}/0.0.2-pre-alpha...master)" >> "$CHANGELOG_FILE"
+# Add full changelog from lastest official tag release
+echo "Full Changelog: [\`v0.0.3...master\`](${BASE_COMPARE_URL}/v0.0.3...master)" >> "$CHANGELOG_FILE"
 echo >> "$CHANGELOG_FILE"
 
 # Generate release table
