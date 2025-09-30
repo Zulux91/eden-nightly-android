@@ -4,12 +4,7 @@ set -ex
 
 echo "Generating changelog for release"
 
-# Clone Eden, fallback to mirror if upstream repo fails to clone
-if ! git clone 'https://git.eden-emu.dev/eden-emu/eden.git' ./eden; then
-	echo "Using mirror instead..."
-	rm -rf ./eden || true
-	git clone 'https://github.com/pflyly/eden-mirror.git' ./eden
-fi
+git clone 'https://git.eden-emu.dev/eden-emu/eden.git' ./eden
 cd ./eden
 
 # Get current commit info
@@ -62,7 +57,9 @@ echo >> "$CHANGELOG_FILE"
 echo "## Unofficial Nightly Release: ${COUNT}" >> "$CHANGELOG_FILE"
 echo "| Platform | Target / Arch |" >> "$CHANGELOG_FILE"
 echo "|--|--|" >> "$CHANGELOG_FILE"
-echo "| Android | [\`Coexist\`](${BASE_DOWNLOAD_URL}/${TAG}/Eden-${COUNT}-Android-Unofficial-Coexist.apk)<br><br>[\`Replace\`](${BASE_DOWNLOAD_URL}/${TAG}/Eden-${COUNT}-Android-Unofficial-Replace.apk)<br><br>[\`Optimised\`](${BASE_DOWNLOAD_URL}/${TAG}/Eden-${COUNT}-Android-Unofficial-Optimised.apk) |" >> "$CHANGELOG_FILE"
+echo "| Android | [\`Replace\`](${BASE_DOWNLOAD_URL}/${TAG}/Eden-${COUNT}-Android-Replace.apk)<br><br>\
+[\`Coexist\`](${BASE_DOWNLOAD_URL}/${TAG}/Eden-${COUNT}-Android-Coexist.apk)<br><br>\
+[\`Optimised\`](${BASE_DOWNLOAD_URL}/${TAG}/Eden-${COUNT}-Android-Optimised.apk) |" >> "$CHANGELOG_FILE"
 echo "| Any | [Source Code](${BASE_DOWNLOAD_URL}/${TAG}/Eden-${COUNT}-Source-Code.7z) |" >> "$CHANGELOG_FILE"
 
 # Pack up source for upload
