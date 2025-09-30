@@ -14,7 +14,7 @@ jobs:
       matrix:
         target: [Info]
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v5.0.0
         with:
           persist-credentials: false
 
@@ -69,41 +69,26 @@ jobs:
       TARGET: ${{ matrix.target }}
 
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v5.0.0
 
       - name: Install dependencies
         run: |
-          sudo apt-get install sccache glslang-tools libvulkan-dev -y
+          sudo apt-get update -y
+          sudo apt-get install sccache glslang-tools libvulkan-dev python3-requests -y
           
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: 17
-          
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v2
-        
-      - name: Pull Eden with submodules
+      - name: Clone Eden
         run: |
-          if ! git clone 'https://git.eden-emu.dev/eden-emu/eden.git' ./eden; then
-            echo "Using mirror instead..."
-            rm -rf ./eden || true
-            git clone 'https://github.com/pflyly/eden-mirror.git' ./eden
-          fi
-          cd ./eden
-          git submodule update --init --recursive
-          
-#      - name: Restore gradle cache for ${{ matrix.target }}
-#        uses: actions/cache/restore@v4
-#        id: restore-gradle-cache
-#        with:
-#          path: |
-#            ~/.gradle/caches
-#            ~/.gradle/wrapper
-#          key: ${{ runner.os }}-gradle-${{ matrix.target }}-${{ github.sha }}
-#          restore-keys: |
-#            ${{ runner.os }}-gradle-${{ matrix.target }}-
+          git clone 'https://git.eden-emu.dev/eden-emu/eden.git' ./eden
+
+      - name: Restore cpm cache for ${{ matrix.target }}
+        uses: actions/cache/restore@v4
+        id: restore-cpm-cache
+        with:
+          path: |
+            ${{ github.workspace }}/eden/.cache
+          key: ${{ runner.os }}-android-cpm-${{ matrix.target }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-android-cpm-${{ matrix.target }}-
 
       - name: Restore sccache for ${{ matrix.target }}
         uses: actions/cache/restore@v4
@@ -125,14 +110,13 @@ jobs:
           name: eden-android-${{ matrix.target }}
           path: eden/src/android/artifacts/
         
-      - name: Save gradle cache for ${{ matrix.target }}
+      - name: Save cpm cache for ${{ matrix.target }}
         if: ${{ github.ref_name == 'main' }}
         uses: actions/cache/save@v4
         with:
           path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ steps.restore-gradle-cache.outputs.cache-primary-key }}
+            ${{ github.workspace }}/eden/.cache
+          key: ${{ steps.restore-cpm-cache.outputs.cache-primary-key }}
 
       - name: Save sccache for ${{ matrix.target }}
         if: ${{ github.ref_name == 'main' }}
@@ -151,33 +135,10 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4.3.0
+      - uses: actions/download-artifact@v5.0.0
         with:
-          name: eden-android-Replace
-
-      - uses: actions/download-artifact@v4.3.0
-        with:
-          name: eden-android-Coexist
-
-      - uses: actions/download-artifact@v4.3.0
-        with:
-          name: eden-android-Optimised
-
-      - uses: actions/download-artifact@v4.3.0
-        with:
-          name: tag
-
-      - uses: actions/download-artifact@v4.3.0
-        with:
-          name: count
-
-      - uses: actions/download-artifact@v4.3.0
-        with:
-          name: changelog
-
-      - uses: actions/download-artifact@v4.3.0
-        with:
-          name: source
+          pattern: "*"
+          merge-multiple: true
 
       - name: Generate changelog
         run: |
@@ -188,7 +149,7 @@ jobs:
           echo "EOF" >> "${GITHUB_ENV}"
 
       - name: Release Eden
-        uses: softprops/action-gh-release@v2.2.2
+        uses: softprops/action-gh-release@v2.3.3
         with:
           name: "Eden Unofficial Nightly Release: ${{ env.COUNT }}"
           tag_name: "${{ env.TAG }}"
