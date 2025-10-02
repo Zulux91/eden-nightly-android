@@ -40,11 +40,10 @@ echo >> "$CHANGELOG_FILE"
 
 # Add changelog section
 echo "## Changelog:" >> "$CHANGELOG_FILE"
-git log --reverse --pretty=format:"%H %s" "${OLD_HASH}..HEAD" | while IFS= read -r line || [ -n "$line" ]; do
-  full_hash="${line%% *}"
-  msg="${line#* }"
+git log --reverse --pretty=format:"%H%x09%s%x09%an" "${OLD_HASH}..HEAD" |
+while IFS=$'\t' read -r full_hash msg author || [ -n "$full_hash" ]; do
   short_hash="$(git rev-parse --short "$full_hash")"
-  echo -e "- Merged commit: \`${i}\` [\`${short_hash}\`](${BASE_COMMIT_URL}/${full_hash})\n  ${msg}" >> "$CHANGELOG_FILE"
+  echo -e "- Merged commit: \`${i}\` [\`${short_hash}\`](${BASE_COMMIT_URL}/${full_hash}) by **${author}**\n  ${msg}" >> "$CHANGELOG_FILE"
   echo >> "$CHANGELOG_FILE"
   i=$((i + 1))
 done
