@@ -74,7 +74,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update -y
-          sudo apt-get install sccache glslang-tools libvulkan-dev python3-requests -y
+          sudo apt-get install glslang-tools libvulkan-dev python3-requests -y
           
       - name: Clone Eden
         run: |
@@ -89,15 +89,6 @@ jobs:
           key: ${{ runner.os }}-android-cpm-${{ matrix.target }}-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-android-cpm-${{ matrix.target }}-
-
-      - name: Restore sccache for ${{ matrix.target }}
-        uses: actions/cache/restore@v4
-        id: restore-sccache-cache
-        with:
-          path: ~/.cache/sccache/
-          key: ${{ runner.os }}-android-sccache-${{ matrix.target }}-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-android-sccache-${{ matrix.target }}-
             
       - name: Compile Eden android
         run: |
@@ -117,13 +108,6 @@ jobs:
           path: |
             ${{ github.workspace }}/eden/.cache
           key: ${{ steps.restore-cpm-cache.outputs.cache-primary-key }}
-
-      - name: Save sccache for ${{ matrix.target }}
-        if: ${{ github.ref_name == 'main' }}
-        uses: actions/cache/save@v4
-        with:
-          path: ~/.cache/sccache/
-          key: ${{ steps.restore-sccache-cache.outputs.cache-primary-key }}
 
   release:
     name: "release"
