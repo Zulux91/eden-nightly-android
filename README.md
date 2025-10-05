@@ -44,7 +44,7 @@ This repository provides **unofficial nightly releases** of **Eden** only for an
 
 ### 🤖 Android Builds
 
-Eden nightly for Android is available in two versions:
+Eden nightly for Android is available in four versions:
 
 - **Replace** Build
   
@@ -54,9 +54,13 @@ Shares the same application ID as the official Eden release. Installing this ver
   
 Uses a nightly application ID, allowing it to coexist with the official Eden release. It appears as "**eden unofficial**" on the home screen, and "**Eden Nightly**" on the main screen of eden.
 
-- **Optimised** Build
+- **Optimized** Build
   
-Using com.miHoYo.Yuanshen for application ID to enable device dependent features such as AI frame generation. It appears as "**Eden Optimised**" on the home screen.
+Using com.miHoYo.Yuanshen for application ID to enable device dependent features such as AI frame generation. It appears as "**Eden Optimized**" on the home screen.
+
+- **Legacy** Build
+  
+Apply patches that improve compatibility with older GPUs (e.g. Snapdragon 865) at the cost of performance. It appears as "**Eden Legacy**" on the home screen.
 
 ---------------------------------------------------------------
 
