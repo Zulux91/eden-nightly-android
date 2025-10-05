@@ -19,7 +19,7 @@ Assuming you already have [custom systems](https://github.com/GlazedBelmont/es-d
 <emulator name="EDEN-NIGHTLY">
 		<!-- Nintendo Switch emulator Eden Nightly build -->
 		<rule type="androidpackage">			
-			<entry>dev.eden.eden_emulator.nightly/org.yuzu.yuzu_emu.activities.EmulationActivity</entry>
+			<entry>dev.eden.eden_nightly/org.yuzu.yuzu_emu.activities.EmulationActivity</entry>
 		</rule>
 	</emulator>
 ```
