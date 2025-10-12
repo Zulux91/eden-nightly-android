@@ -67,23 +67,43 @@ jobs:
     name: "Android (${{ matrix.target }})"
     env:
       TARGET: ${{ matrix.target }}
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_COMPILERCHECK: content
+      CCACHE_SLOPPINESS: time_macros
 
     steps:
       - uses: actions/checkout@v5.0.0
 
       - name: Install dependencies
         run: |
+          sudo rm /var/lib/man-db/auto-update
           sudo apt-get update -y
-          sudo apt-get install glslang-tools libvulkan-dev python3-requests -y
+          sudo apt-get install ccache glslang-tools libvulkan-dev python3-requests -y
           
       - name: Clone Eden
         run: |
           git clone 'https://git.eden-emu.dev/eden-emu/eden.git' ./eden
+
+      - name: Restore ccache for ${{ matrix.target }}
+        uses: actions/cache/restore@v4
+        id: restore-ccache-cache
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ${{ runner.os }}-android-ccache-${{ matrix.target }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-android-ccache-${{ matrix.target }}-
             
       - name: Compile Eden android
         run: |
           chmod +x ./eden-android.sh
           ./eden-android.sh
+
+      - name: Save ccache for ${{ matrix.target }}
+        if: ${{ github.ref_name == 'main' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ${{ steps.restore-ccache-cache.outputs.cache-primary-key }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4.6.2
