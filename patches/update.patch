@@ -1,0 +1,75 @@
+diff --git a/CMakeModules/GenerateSCMRev.cmake b/CMakeModules/GenerateSCMRev.cmake
+index 1ae608c085..f45c556d77 100644
+--- a/CMakeModules/GenerateSCMRev.cmake
++++ b/CMakeModules/GenerateSCMRev.cmake
+@@ -8,19 +8,37 @@
+ include(GetSCMRev)
+ 
+ function(get_timestamp _var)
+-    string(TIMESTAMP timestamp UTC)
++    string(TIMESTAMP timestamp "%Y-%m-%d" UTC)
+     set(${_var} "${timestamp}" PARENT_SCOPE)
+ endfunction()
+ 
+ get_timestamp(BUILD_DATE)
+ 
++function(git_count _var)
++    execute_process(
++        COMMAND "${GIT_EXECUTABLE}" rev-list --count HEAD
++        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
++        RESULT_VARIABLE res
++        OUTPUT_VARIABLE out
++        ERROR_QUIET
++        OUTPUT_STRIP_TRAILING_WHITESPACE
++    )
++
++    if(NOT res EQUAL 0)
++        set(out "${out}-${res}-NOTFOUND")
++    endif()
++
++    set(${_var} "${out}" PARENT_SCOPE)
++endfunction()
++
++git_count(GIT_COUNT)
++
+ if (DEFINED GIT_RELEASE)
+   set(BUILD_VERSION "${GIT_TAG}")
+   set(GIT_REFSPEC "${GIT_RELEASE}")
+   set(IS_DEV_BUILD false)
+ else()
+-  string(SUBSTRING ${GIT_COMMIT} 0 10 BUILD_VERSION)
+-  set(BUILD_VERSION "${BUILD_VERSION}-${GIT_REFSPEC}")
++  set(BUILD_VERSION "${BUILD_DATE}-${GIT_COUNT}")
+   set(IS_DEV_BUILD true)
+ endif()
+ 
+@@ -28,7 +46,7 @@ set(GIT_DESC ${BUILD_VERSION})
+ 
+ # Generate cpp with Git revision from template
+ # Also if this is a CI build, add the build name (ie: Nightly, Canary) to the scm_rev file as well
+-set(REPO_NAME "Eden")
++set(REPO_NAME "Eden Nightly")
+ set(BUILD_ID ${GIT_REFSPEC})
+ set(BUILD_FULLNAME "${REPO_NAME} ${BUILD_VERSION} ")
+ set(CXX_COMPILER "${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
+@@ -36,6 +54,6 @@ set(CXX_COMPILER "${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
+ # Auto-updater metadata! Must somewhat mirror GitHub API endpoint
+ set(BUILD_AUTO_UPDATE_WEBSITE "https://github.com")
+ set(BUILD_AUTO_UPDATE_API "http://api.github.com")
+-set(BUILD_AUTO_UPDATE_REPO "eden-emulator/Releases")
++set(BUILD_AUTO_UPDATE_REPO "Zulux91/eden-nightly-android")
+ 
+ configure_file(scm_rev.cpp.in scm_rev.cpp @ONLY)
+diff --git a/src/yuzu/about_dialog.cpp b/src/yuzu/about_dialog.cpp
+index 9f7597f471..b73cd41c1e 100644
+--- a/src/yuzu/about_dialog.cpp
++++ b/src/yuzu/about_dialog.cpp
+@@ -34,7 +34,7 @@ AboutDialog::AboutDialog(QWidget* parent)
+     }
+     ui->labelBuildInfo->setText(
+         ui->labelBuildInfo->text().arg(QString::fromStdString(yuzu_build_version),
+-                                       QString::fromUtf8(Common::g_build_date).left(10)));
++                                       QString::fromUtf8(Common::g_build_id)));
+ }
+ 
+ AboutDialog::~AboutDialog() = default;
