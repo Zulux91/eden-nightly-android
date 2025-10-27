@@ -89,7 +89,7 @@ jobs:
         id: restore-ccache-cache
         with:
           path: ${{ env.CCACHE_DIR }}
-          key: ${{ runner.os }}-android-ccache-${{ matrix.target }}-${{ github.sha }}
+          key: ${{ runner.os }}-android-ccache-${{ matrix.target }}-${{ github.run_id }}
           restore-keys: |
             ${{ runner.os }}-android-ccache-${{ matrix.target }}-
             
