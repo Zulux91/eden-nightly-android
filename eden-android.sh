@@ -3,10 +3,10 @@
 cd ./eden
 
 # hook the updater to check my repo
-# git apply ../patches/update.patch
+git apply ../patches/update.patch
 
 # silence annoying warnings
-git apply ../patches/warning.patch
+# git apply ../patches/warning.patch
 
 if [ "$TARGET" = "Coexist" ]; then
     # Change the App name and application ID to make it coexist with official build
@@ -20,11 +20,11 @@ APK_NAME="Eden-${COUNT}-Android-${TARGET}"
 cd src/android
 chmod +x ./gradlew
 if [ "$TARGET" = "Optimized" ]; then
-	./gradlew assembleGenshinSpoofRelease -PYUZU_ANDROID_ARGS="-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache"
+	./gradlew assembleGenshinSpoofRelease -PYUZU_ANDROID_ARGS="-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DENABLE_UPDATE_CHECKER=ON"
 elif [ "$TARGET" = "Legacy" ]; then
-	./gradlew assembleLegacyRelease -PYUZU_ANDROID_ARGS="-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache"
+	./gradlew assembleLegacyRelease -PYUZU_ANDROID_ARGS="-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DENABLE_UPDATE_CHECKER=ON"
 else
-	./gradlew assembleMainlineRelease -PYUZU_ANDROID_ARGS="-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache"
+	./gradlew assembleMainlineRelease -PYUZU_ANDROID_ARGS="-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DENABLE_UPDATE_CHECKER=ON"
 fi
 ccache -s -v
 
