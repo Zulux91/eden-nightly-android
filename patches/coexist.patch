@@ -1,0 +1,28 @@
+diff --git a/src/android/app/build.gradle.kts b/src/android/app/build.gradle.kts
+index b03ae732d4..e01c486141 100644
+--- a/src/android/app/build.gradle.kts
++++ b/src/android/app/build.gradle.kts
+@@ -57,7 +57,7 @@ android {
+     }
+ 
+     defaultConfig {
+-        applicationId = "dev.eden.eden_emulator"
++        applicationId = "dev.eden.eden_nightly"
+         minSdk = 24
+         targetSdk = 36
+         versionName = getGitVersion()
+@@ -192,7 +192,13 @@ android {
+         productFlavors {
+             create("mainline") {
+                 dimension = "version"
+-                resValue("string", "app_name_suffixed", "Eden")
++                resValue("string", "app_name_suffixed", "Eden Nightly")
++
++                sourceSets {
++                    getByName("mainline") {
++                        res.srcDirs("src/main/legacy")
++                    }
++                }
+             }
+ 
+             create("genshinSpoof") {
