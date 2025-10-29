@@ -5,13 +5,9 @@ cd ./eden
 # hook the updater to check my repo
 git apply ../patches/update.patch
 
-# silence annoying warnings
-# git apply ../patches/warning.patch
-
 if [ "$TARGET" = "Coexist" ]; then
-    # Change the App name and application ID to make it coexist with official build
-    sed -i 's/applicationId = "dev\.eden\.eden_emulator"/applicationId = "dev.eden.eden_nightly"/' src/android/app/build.gradle.kts
-    sed -i 's/resValue("string", "app_name_suffixed", "Eden")/resValue("string", "app_name_suffixed", "Eden Nightly")/' src/android/app/build.gradle.kts
+    # Change the App name and application ID to make it coexist with official build, and use different launcher icon
+    git apply ../patches/coexist.patch
 fi
 
 COUNT="$(git rev-list --count HEAD)"
