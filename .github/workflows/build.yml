@@ -77,7 +77,6 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo rm /var/lib/man-db/auto-update
           sudo apt-get update -y
           sudo apt-get install ccache glslang-tools libvulkan-dev python3-requests -y
           
