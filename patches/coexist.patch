@@ -11,18 +11,17 @@ index b03ae732d4..e01c486141 100644
          minSdk = 24
          targetSdk = 36
          versionName = getGitVersion()
-@@ -162,7 +162,13 @@ android {
-         productFlavors {
-             create("mainline") {
-                 dimension = "version"
--                resValue("string", "app_name_suffixed", "Eden")
-+                resValue("string", "app_name_suffixed", "Eden Nightly")
+@@ -163,7 +163,13 @@ android {
+         create("mainline") {
+             dimension = "version"
+-            resValue("string", "app_name_suffixed", "Eden")
++            resValue("string", "app_name_suffixed", "Eden Nightly")
 +
-+                sourceSets {
-+                    getByName("mainline") {
-+                        res.srcDirs("src/main/legacy")
-+                    }
++            sourceSets {
++                getByName("mainline") {
++                    res.srcDirs("src/main/legacy")
 +                }
-             }
++            }
+         }
  
-             create("genshinSpoof") {
+         create("genshinSpoof") {
