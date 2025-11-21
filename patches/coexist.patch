@@ -17,12 +17,12 @@ index 01a4132..4a419f7 100644
              dimension = "version"
 -            resValue("string", "app_name_suffixed", "Eden")
 +            resValue("string", "app_name_suffixed", "Eden Nightly")
-++
-++            sourceSets {
-++                getByName("mainline") {
-++                    res.srcDirs("src/main/legacy")
-++                }
-++            }
++
++            sourceSets {
++                getByName("mainline") {
++                    res.srcDirs("src/main/legacy")
++                }
++            }
          }
  
          create("genshinSpoof") {
