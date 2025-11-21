@@ -11,7 +11,7 @@ index b03ae732d4..e01c486141 100644
          minSdk = 24
          targetSdk = 36
          versionName = getGitVersion()
-@@ -192,7 +192,13 @@ android {
+@@ -163,7 +163,13 @@ android {
          productFlavors {
              create("mainline") {
                  dimension = "version"
