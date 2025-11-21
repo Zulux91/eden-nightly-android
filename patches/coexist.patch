@@ -1,7 +1,7 @@
 diff --git a/src/android/app/build.gradle.kts b/src/android/app/build.gradle.kts
 index 01a4132..4a419f7 100644
---- a/build.gradle.kts
-+++ b/Copia - build.gradle.kts	
+--- a/src/android/app/build.gradle.kts
++++ b/src/android/app/build.gradle.kts	
 @@ -57,7 +57,7 @@ android {
      }
  
