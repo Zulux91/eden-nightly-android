@@ -1,0 +1,72 @@
+diff --git a/src/android/app/build.gradle.kts b/src/android/app/build.gradle.kts
+index 01a413261e..0f6fc0f114 100644
+--- a/src/android/app/build.gradle.kts
++++ b/src/android/app/build.gradle.kts
+@@ -306,18 +306,13 @@ fun runGitCommand(command: List<String>): String {
+ }
+ 
+ fun getGitVersion(): String {
+-    val gitVersion = runGitCommand(
++    val commitCountString = runGitCommand(
+         listOf(
+             "git",
+-            "describe",
+-            "--always",
+-            "--long"
++            "rev-list",
++            "--count",
++            "HEAD"
+         )
+-    ).replace(Regex("(-0)?-[^-]+$"), "")
+-    val versionName = if (System.getenv("GITHUB_ACTIONS") != null) {
+-        System.getenv("GIT_TAG_NAME") ?: gitVersion
+-    } else {
+-        gitVersion
+-    }
+-    return versionName.ifEmpty { "0.0" }
++    ).trim()
++    return (commitCountString.toIntOrNull() ?: 1).toString()
+ }
+diff --git a/src/android/app/src/main/java/org/yuzu/yuzu_emu/fragments/AboutFragment.kt b/src/android/app/src/main/java/org/yuzu/yuzu_emu/fragments/AboutFragment.kt
+index edd1b0765d..4c129e474b 100644
+--- a/src/android/app/src/main/java/org/yuzu/yuzu_emu/fragments/AboutFragment.kt
++++ b/src/android/app/src/main/java/org/yuzu/yuzu_emu/fragments/AboutFragment.kt
+@@ -85,6 +85,9 @@ class AboutFragment : Fragment() {
+ 
+         binding.textVersionName.text = fullVersionText
+         binding.buttonVersionName.setOnClickListener {
++            val nightlyLink = NativeLibrary.getUpdateUrl(buildVersion)
++            openLink(nightlyLink)
++
+             val clipBoard =
+                 requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+             val clip = ClipData.newPlainText(getString(R.string.build), fullVersionText)
+diff --git a/src/android/app/src/main/jni/native.cpp b/src/android/app/src/main/jni/native.cpp
+index f28f4a9b7b..e031ce536c 100644
+--- a/src/android/app/src/main/jni/native.cpp
++++ b/src/android/app/src/main/jni/native.cpp
+@@ -1626,14 +1626,20 @@ JNIEXPORT jstring JNICALL Java_org_yuzu_yuzu_1emu_NativeLibrary_getUpdateApkUrl(
+     std::string package_id(package_id_str);
+ 
+     if (package_id.find("dev.legacy.eden_emulator") != std::string::npos) {
+-        variant = "legacy";
++        variant = "Legacy";
+     } else if (package_id.find("com.miHoYo.Yuanshen") != std::string::npos) {
+-        variant = "optimized";
++        variant = "Optimized";
++    } else if (package_id.find("dev.eden.eden_nightly") != std::string::npos) {
++        variant = "Coexist";
+     } else {
+-        variant = "standard";
++        variant = "Replace";
+     }
+ 
+-    const std::string apk_filename = fmt::format("Eden-Android-{}-{}.apk", version_str, variant);
++    std::string version_full(version_str);
++    const size_t last_hyphen = version_full.rfind('-');
++    const std::string commit_count = version_full.substr(last_hyphen + 1);
++
++    const std::string apk_filename = fmt::format("Eden-{}-Android-{}.apk", commit_count, variant);
+     const std::string url = fmt::format("{}/{}/releases/download/{}/{}",
+         std::string{Common::g_build_auto_update_website},
+         std::string{Common::g_build_auto_update_repo},
