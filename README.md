@@ -58,6 +58,10 @@ Uses a nightly application ID, allowing it to coexist with the official Eden rel
   
 Using com.miHoYo.Yuanshen for application ID to enable device dependent features such as AI frame generation. It appears as "**Eden Optimized**" on the home screen.
 
+- **ChromeOs** Build
+
+Android x86_64 build for devices running Chrome/FydeOS, AVD emulators, or certain Intel Atom Android devices.
+
 - **Legacy** Build
   
 Apply patches that improve compatibility with older GPUs (e.g. Snapdragon 865) at the cost of performance. It appears as "**Eden Legacy**" on the home screen.
