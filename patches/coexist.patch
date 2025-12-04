@@ -1,8 +1,8 @@
 diff --git a/src/android/app/build.gradle.kts b/src/android/app/build.gradle.kts
-index 01a4132..4a419f7 100644
+index 87d815c92c..ad3688d13e 100644
 --- a/src/android/app/build.gradle.kts
-+++ b/src/android/app/build.gradle.kts	
-@@ -57,7 +57,7 @@ android {
++++ b/src/android/app/build.gradle.kts
+@@ -58,7 +58,7 @@ android {
      }
  
      defaultConfig {
@@ -11,7 +11,7 @@ index 01a4132..4a419f7 100644
          minSdk = 24
          targetSdk = 36
          versionName = getGitVersion()
-@@ -162,7 +162,13 @@ android {
+@@ -158,7 +158,13 @@ android {
      productFlavors {
          create("mainline") {
              dimension = "version"
@@ -23,6 +23,6 @@ index 01a4132..4a419f7 100644
 +                    res.srcDirs("src/main/legacy")
 +                }
 +            }
-         }
  
-         create("genshinSpoof") {
+             ndk {
+                 abiFilters += listOf("arm64-v8a")
