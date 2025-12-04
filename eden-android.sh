@@ -48,9 +48,6 @@ case "$TARGET" in
 	Legacy)
 		FLAVOR="Legacy"
 	;;
-	ChromeOS)
-		FLAVOR="ChromeOS"
-	;;
 	*)
 		FLAVOR="Mainline"
 	;;
