@@ -63,7 +63,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [Replace, Coexist, Optimized, Legacy, ChromeOS]
+        target: [Replace, Coexist, Optimized, Legacy]
     continue-on-error: true
     name: "Android (${{ matrix.target }})"
     env:
