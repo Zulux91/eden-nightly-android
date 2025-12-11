@@ -1,0 +1,18 @@
+diff --git a/.patch/mbedtls/0002-arm64-aes-fix.patch b/.patch/mbedtls/0002-arm64-aes-fix.patch
+index 285cb75139..9d8b54c5c3 100644
+--- a/.patch/mbedtls/0002-arm64-aes-fix.patch
++++ b/.patch/mbedtls/0002-arm64-aes-fix.patch
+@@ -9,11 +9,11 @@ index 50f2a29..c60d9dc 100644
+ -#if defined(__ARM_NEON)
+ -#include <arm_neon.h>
+ +#if defined(MBEDTLS_PLATFORM_IS_WINDOWS_ON_ARM64)
+-+#include <arm64_neon.h.h>
+++#include <arm64_neon.h>
+  #define MBEDTLS_HAVE_NEON_INTRINSICS
+ -#elif defined(MBEDTLS_PLATFORM_IS_WINDOWS_ON_ARM64)
+ -#include <arm64_neon.h>
+-+#elif defined(__ANDROID__) || defined(__ARM_NEON)
+++#elif (defined(__ANDROID__) && (defined(__aarch64__) || defined(__arm__))) || defined(__ARM_NEON)
+ +#include <arm_neon.h>
+  #define MBEDTLS_HAVE_NEON_INTRINSICS
+  #endif

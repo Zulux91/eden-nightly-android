@@ -1,8 +1,8 @@
 diff --git a/src/android/app/build.gradle.kts b/src/android/app/build.gradle.kts
-index 01a413261e..0f6fc0f114 100644
+index 87d815c92c..ba6a5c15c5 100644
 --- a/src/android/app/build.gradle.kts
 +++ b/src/android/app/build.gradle.kts
-@@ -306,18 +306,13 @@ fun runGitCommand(command: List<String>): String {
+@@ -329,20 +329,15 @@ fun runGitCommand(command: List<String>): String {
  }
  
  fun getGitVersion(): String {
@@ -27,6 +27,8 @@ index 01a413261e..0f6fc0f114 100644
 +    ).trim()
 +    return (commitCountString.toIntOrNull() ?: 1).toString()
  }
+ 
+ afterEvaluate {
 diff --git a/src/android/app/src/main/java/org/yuzu/yuzu_emu/fragments/AboutFragment.kt b/src/android/app/src/main/java/org/yuzu/yuzu_emu/fragments/AboutFragment.kt
 index edd1b0765d..4c129e474b 100644
 --- a/src/android/app/src/main/java/org/yuzu/yuzu_emu/fragments/AboutFragment.kt
@@ -41,11 +43,44 @@ index edd1b0765d..4c129e474b 100644
              val clipBoard =
                  requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
              val clip = ClipData.newPlainText(getString(R.string.build), fullVersionText)
+diff --git a/src/android/app/src/main/java/org/yuzu/yuzu_emu/ui/main/MainActivity.kt b/src/android/app/src/main/java/org/yuzu/yuzu_emu/ui/main/MainActivity.kt
+index 538d8f6e49..358836e3ec 100644
+--- a/src/android/app/src/main/java/org/yuzu/yuzu_emu/ui/main/MainActivity.kt
++++ b/src/android/app/src/main/java/org/yuzu/yuzu_emu/ui/main/MainActivity.kt
+@@ -211,10 +211,11 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
+         CoroutineScope(Dispatchers.IO).launch {
+             val packageId = applicationContext.packageName
+             val apkUrl = NativeLibrary.getUpdateApkUrl(version, packageId)
++            val fileName = apkUrl.substringAfterLast("/")
+             val apkFile = File(cacheDir, "update-$version.apk")
+ 
+             withContext(Dispatchers.Main) {
+-                showDownloadProgressDialog()
++                showDownloadProgressDialog(fileName)
+             }
+ 
+             val downloader = APKDownloader(apkUrl, apkFile)
+@@ -263,13 +264,14 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
+     private var progressBar: LinearProgressIndicator? = null
+     private var progressMessage: MaterialTextView? = null
+ 
+-    private fun showDownloadProgressDialog() {
++    private fun showDownloadProgressDialog(fileName: String) {
+         val progressView = layoutInflater.inflate(R.layout.dialog_download_progress, null)
+         progressBar = progressView.findViewById(R.id.download_progress_bar)
+         progressMessage = progressView.findViewById(R.id.download_progress_message)
+ 
+         progressDialog = MaterialAlertDialogBuilder(this)
+             .setTitle(R.string.downloading_update)
++            .setMessage(fileName)
+             .setView(progressView)
+             .setCancelable(false)
+             .create()
 diff --git a/src/android/app/src/main/jni/native.cpp b/src/android/app/src/main/jni/native.cpp
-index f28f4a9b7b..e031ce536c 100644
+index f28f4a9b7b..57cb5bc736 100644
 --- a/src/android/app/src/main/jni/native.cpp
 +++ b/src/android/app/src/main/jni/native.cpp
-@@ -1626,14 +1626,20 @@ JNIEXPORT jstring JNICALL Java_org_yuzu_yuzu_1emu_NativeLibrary_getUpdateApkUrl(
+@@ -1626,14 +1626,24 @@ JNIEXPORT jstring JNICALL Java_org_yuzu_yuzu_1emu_NativeLibrary_getUpdateApkUrl(
      std::string package_id(package_id_str);
  
      if (package_id.find("dev.legacy.eden_emulator") != std::string::npos) {
@@ -58,7 +93,11 @@ index f28f4a9b7b..e031ce536c 100644
 +        variant = "Coexist";
      } else {
 -        variant = "standard";
++#ifdef ARCHITECTURE_arm64
 +        variant = "Replace";
++#else
++        variant = "ChromeOS";
++#endif
      }
  
 -    const std::string apk_filename = fmt::format("Eden-Android-{}-{}.apk", version_str, variant);
