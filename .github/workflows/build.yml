@@ -85,7 +85,7 @@ jobs:
           git clone 'https://git.eden-emu.dev/eden-emu/eden.git' ./eden
 
       - name: Restore ccache for ${{ matrix.target }}
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         id: restore-ccache-cache
         with:
           path: ${{ env.CCACHE_DIR }}
@@ -100,7 +100,7 @@ jobs:
 
       - name: Save ccache for ${{ matrix.target }}
         if: ${{ github.ref_name == 'main' }}
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: ${{ env.CCACHE_DIR }}
           key: ${{ steps.restore-ccache-cache.outputs.cache-primary-key }}
