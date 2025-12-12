@@ -35,25 +35,25 @@ jobs:
           ./changelog.sh
 
       - name: Upload tag file
-        uses: actions/upload-artifact@v5.0.0
+        uses: actions/upload-artifact@v6.0.0
         with:
           name: tag
           path: ~/tag
 
       - name: Upload count file
-        uses: actions/upload-artifact@v5.0.0
+        uses: actions/upload-artifact@v6.0.0
         with:
           name: count
           path: ~/count
 
       - name: Upload changelog file
-        uses: actions/upload-artifact@v5.0.0
+        uses: actions/upload-artifact@v6.0.0
         with:
           name: changelog
           path: ~/changelog
 
       - name: Upload source code
-        uses: actions/upload-artifact@v5.0.0
+        uses: actions/upload-artifact@v6.0.0
         with:
           name: source
           path: artifacts
@@ -106,7 +106,7 @@ jobs:
           key: ${{ steps.restore-ccache-cache.outputs.cache-primary-key }}
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v5.0.0
+        uses: actions/upload-artifact@v6.0.0
         with:
           name: eden-android-${{ matrix.target }}
           path: eden/src/android/artifacts/
@@ -121,7 +121,7 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v6.0.0
+      - uses: actions/download-artifact@v7.0.0
         with:
           pattern: "*"
           merge-multiple: true
