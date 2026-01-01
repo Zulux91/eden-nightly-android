@@ -49,7 +49,7 @@ while IFS=$'\t' read -r full_hash msg author || [ -n "$full_hash" ]; do
 done
 
 # Add full changelog from lastest official tag release
-echo "Full Changelog: [\`v0.0.3...master\`](${BASE_COMPARE_URL}/v0.0.3...master)" >> "$CHANGELOG_FILE"
+echo "Full Changelog: [\`v0.0.4...master\`](${BASE_COMPARE_URL}/v0.0.4...master)" >> "$CHANGELOG_FILE"
 echo >> "$CHANGELOG_FILE"
 
 # Generate release table
