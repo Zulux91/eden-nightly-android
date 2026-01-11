@@ -21,9 +21,14 @@ jobs:
       - name: Get the latest release count
         env:
           GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          GH_REPO: ${{ github.repository }}
         run: |
-          api_url="https://api.github.com/repos/${{ github.repository }}"
-          latest_release_info=$(curl -H "Authorization: token $GH_TOKEN" "$api_url/releases/latest")
+          GH_AUTH_HEADER=""
+          if [ -n "$GH_TOKEN" ]; then
+            GH_AUTH_HEADER="Authorization: token $GH_TOKEN"
+          fi
+          api_url="https://api.github.com/repos/$GH_REPO"
+          latest_release_info=$(curl -H "$GH_AUTH_HEADER" "$api_url/releases/latest")
           last_release_tag=$(echo "$latest_release_info" | jq -r '.tag_name')
           echo "${last_release_tag}"
           old_count="${last_release_tag##*-}"
@@ -33,44 +38,48 @@ jobs:
         run: |
           chmod +x ./changelog.sh
           ./changelog.sh
+      
+      - name: Compare Count
+        id: compare_count
+        run: |
+          NEW_COUNT=$(cat ~/count)
 
-      - name: Upload tag file
+          echo "-- Release Count Check:"
+          echo "   Previous Release Count: $OLD_COUNT"
+          echo "   Current Source Count:  $NEW_COUNT"
+
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "-- Pull request detected, proceeding with the build."
+            echo "should_skip=false" >> "$GITHUB_OUTPUT"
+          elif [ "$NEW_COUNT" = "$OLD_COUNT" ]; then
+            echo "::notice title=Build Skipped::No new commits detected (Current count: $NEW_COUNT). Skipping downstream jobs."
+            echo "should_skip=true" >> "$GITHUB_OUTPUT"
+            echo "-- [SKIP] No changes detected. Current version is up to date."
+          else
+            echo "should_skip=false" >> "$GITHUB_OUTPUT"
+            echo "-- [PROCEED] New changes detected. Starting release process."
+          fi
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v6.0.0
         with:
-          name: tag
-          path: ~/tag
-
-      - name: Upload count file
-        uses: actions/upload-artifact@v6.0.0
-        with:
-          name: count
-          path: ~/count
-
-      - name: Upload changelog file
-        uses: actions/upload-artifact@v6.0.0
-        with:
-          name: changelog
-          path: ~/changelog
-
-      - name: Upload source code
-        uses: actions/upload-artifact@v6.0.0
-        with:
-          name: source
-          path: artifacts
+          name: info-artifacts
+          path: |
+            ~/tag
+            ~/count
+            ~/changelog
 
   android:
+    needs: [info]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         target: [Replace, Coexist, Optimized, Legacy, ChromeOS]
-    continue-on-error: true
     name: "Android (${{ matrix.target }})"
     env:
       TARGET: ${{ matrix.target }}
-      CCACHE_DIR: ${{ github.workspace }}/.ccache
-      CCACHE_COMPILERCHECK: content
-      CCACHE_SLOPPINESS: time_macros
+      SCCACHE_GHA_ENABLED: "true"
 
     steps:
       - uses: actions/checkout@v6.0.1
@@ -79,31 +88,20 @@ jobs:
         run: |
           sudo apt-get update -y
           sudo apt-get install ccache glslang-tools libvulkan-dev python3-requests -y
+      
+      - name: Install sccache
+        uses: Eden-CI/sccache-action@v0.0.2
+        with:
+          disable_annotations: true
           
       - name: Clone Eden
         run: |
           git clone 'https://git.eden-emu.dev/eden-emu/eden.git' ./eden
-
-      - name: Restore ccache for ${{ matrix.target }}
-        uses: actions/cache/restore@v5
-        id: restore-ccache-cache
-        with:
-          path: ${{ env.CCACHE_DIR }}
-          key: ${{ runner.os }}-android-ccache-${{ matrix.target }}-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-android-ccache-${{ matrix.target }}-
             
       - name: Compile Eden android
         run: |
           chmod +x ./eden-android.sh
           ./eden-android.sh
-
-      - name: Save ccache for ${{ matrix.target }}
-        if: ${{ github.ref_name == 'main' }}
-        uses: actions/cache/save@v5
-        with:
-          path: ${{ env.CCACHE_DIR }}
-          key: ${{ steps.restore-ccache-cache.outputs.cache-primary-key }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6.0.0
