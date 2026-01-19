@@ -1,0 +1,303 @@
+diff --git a/src/android/app/src/main/java/org/yuzu/yuzu_emu/ui/main/MainActivity.kt b/src/android/app/src/main/java/org/yuzu/yuzu_emu/ui/main/MainActivity.kt
+index 23716ac5a5..11257f2f46 100644
+--- a/src/android/app/src/main/java/org/yuzu/yuzu_emu/ui/main/MainActivity.kt
++++ b/src/android/app/src/main/java/org/yuzu/yuzu_emu/ui/main/MainActivity.kt
+@@ -180,19 +180,57 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
+ 
+     private fun checkForUpdates() {
+         Thread {
+-            val latestVersion = NativeLibrary.checkForUpdate()
+-            if (latestVersion != null) {
++            val result = NativeLibrary.checkForUpdate()
++            if (result != null) {
++                val parts = result.split("|", limit = 2)
++                val version = parts[0]
++                val changelog = if (parts.size > 1) parts[1] else ""
++
+                 runOnUiThread {
+-                    showUpdateDialog(latestVersion)
++                    showUpdateDialog(version, changelog)
+                 }
+             }
+         }.start()
+     }
+ 
+-    private fun showUpdateDialog(version: String) {
++    private fun showUpdateDialog(version: String, changelog: String) {
++        val scrollView = android.widget.ScrollView(this)
++
++        val textView = android.widget.TextView(this).apply {
++            val escapedLog = changelog
++            .replace("&", "&amp;")
++            .replace("<", "&lt;")
++            .replace(">", "&gt;")
++            .replace("\"", "&quot;")
++            .replace("'", "&#39;")
++
++            val formattedLog = escapedLog
++                .replace(Regex("^\\s*[-*]\\s+", RegexOption.MULTILINE), "• ")
++                .replace(Regex("^\\s{2,}[-*]\\s+", RegexOption.MULTILINE), "&nbsp;&nbsp;&nbsp;&nbsp;• ")
++                .replace(Regex("\\[(.*?)\\]\\((.*?)\\)"), "<a href=\"$2\">$1</a>")
++                .replace(Regex("\\*\\*(.*?)\\*\\*"), "<b>$1</b>")
++                .replace(Regex("`(.*?)`"), "<font color='#FF4081'><tt>$1</tt></font>")
++                .replace("\n", "<br>")
++
++            val description = getString(R.string.update_available_description, version)
++            val fullContent = "<b>$description</b><br><br><b>Changelog:</b><br>$formattedLog"
++
++            text = android.text.Html.fromHtml(fullContent, android.text.Html.FROM_HTML_MODE_COMPACT)
++
++            movementMethod = android.text.method.LinkMovementMethod.getInstance()
++
++            linksClickable = true
++
++            val padding = (16 * resources.displayMetrics.density).toInt()
++            setPadding(padding, padding, padding, padding)
++            textSize = 14f
++        }
++
++        scrollView.addView(textView)
++
+         MaterialAlertDialogBuilder(this)
+             .setTitle(R.string.update_available)
+-            .setMessage(getString(R.string.update_available_description, version))
++            .setView(scrollView)
+             .setPositiveButton(android.R.string.ok) { _, _ ->
+                 downloadAndInstallUpdate(version)
+             }
+diff --git a/src/android/app/src/main/jni/native.cpp b/src/android/app/src/main/jni/native.cpp
+index 5746659b68..aaf5e1350e 100644
+--- a/src/android/app/src/main/jni/native.cpp
++++ b/src/android/app/src/main/jni/native.cpp
+@@ -1615,11 +1615,12 @@ JNIEXPORT jstring JNICALL Java_org_yuzu_yuzu_1emu_NativeLibrary_checkForUpdate(
+                                 (strstr(Common::g_build_version, "alpha") != nullptr) ||
+                                 (strstr(Common::g_build_version, "beta") != nullptr) ||
+                                 (strstr(Common::g_build_version, "rc") != nullptr));
+-    const std::optional<std::string> latest_release_tag =
++    const std::optional<UpdateChecker::ReleaseInfo> latest_release =
+         UpdateChecker::GetLatestRelease(is_prerelease);
+ 
+-    if (latest_release_tag && latest_release_tag.value() != Common::g_build_version) {
+-        return env->NewStringUTF(latest_release_tag.value().c_str());
++    if (latest_release && latest_release->tag_name != Common::g_build_version) {
++        std::string result = latest_release->tag_name + "|" + latest_release->body;
++        return env->NewStringUTF(result.c_str());
+     }
+     return nullptr;
+ }
+diff --git a/src/frontend_common/update_checker.cpp b/src/frontend_common/update_checker.cpp
+index 9a8143c788..d0814e4418 100644
+--- a/src/frontend_common/update_checker.cpp
++++ b/src/frontend_common/update_checker.cpp
+@@ -78,7 +78,7 @@ std::optional<std::string> UpdateChecker::GetResponse(std::string url, std::stri
+     }
+ }
+ 
+-std::optional<std::string> UpdateChecker::GetLatestRelease(bool include_prereleases) {
++std::optional<UpdateChecker::ReleaseInfo> UpdateChecker::GetLatestRelease(bool include_prereleases) {
+     const auto update_check_url = std::string{Common::g_build_auto_update_api};
+     std::string update_check_path = fmt::format("/repos/{}",
+                                                 std::string{Common::g_build_auto_update_repo});
+@@ -103,9 +103,12 @@ std::optional<std::string> UpdateChecker::GetLatestRelease(bool include_prerelea
+             // If there is a newer tag, but that tag has no associated release, don't prompt the
+             // user to update.
+             if (!latest_tag_has_release)
+-                return {};
++                return std::nullopt;
+ 
+-            return latest_tag;
++            return ReleaseInfo{
++                latest_tag,
++                ""
++            };
+         } else { // This is a stable release, only check for other stable releases.
+             update_check_path += "/releases/latest";
+             const auto response = UpdateChecker::GetResponse(update_check_url, update_check_path);
+@@ -113,8 +116,32 @@ std::optional<std::string> UpdateChecker::GetLatestRelease(bool include_prerelea
+             if (!response)
+                 return {};
+ 
+-            const std::string latest_tag = nlohmann::json::parse(response.value()).at("tag_name");
+-            return latest_tag;
++            auto json = nlohmann::json::parse(response.value());
++            std::string full_body = json.value("body", "");
++            std::string extracted_changelog = "";
++
++            const std::string start_marker = "## Changelog:";
++            const std::string end_marker = "## ";
++
++            size_t start_pos = full_body.find(start_marker);
++            if (start_pos != std::string::npos) {
++                size_t content_start = start_pos + start_marker.length();
++                size_t end_pos = full_body.find(end_marker, start_pos + start_marker.length());
++
++                if (end_pos != std::string::npos) {
++                    extracted_changelog = full_body.substr(content_start, end_pos - content_start);
++                } else {
++                    extracted_changelog = full_body.substr(content_start);
++                }
++            } else {
++                extracted_changelog = full_body;
++            }
++            extracted_changelog.erase(extracted_changelog.find_last_not_of(" \n\r\t") + 1);
++
++            return ReleaseInfo{
++                json.at("tag_name").get<std::string>(),
++                extracted_changelog
++            };
+         }
+ 
+     } catch (nlohmann::detail::out_of_range &) {
+diff --git a/src/frontend_common/update_checker.h b/src/frontend_common/update_checker.h
+index 957843bee0..dad3221fdf 100644
+--- a/src/frontend_common/update_checker.h
++++ b/src/frontend_common/update_checker.h
+@@ -11,6 +11,11 @@
+ #include <string>
+ 
+ namespace UpdateChecker {
++struct ReleaseInfo {
++    std::string tag_name;
++    std::string body;
++};
++
+ std::optional<std::string> GetResponse(std::string url, std::string path);
+-std::optional<std::string> GetLatestRelease(bool include_prereleases);
++std::optional<ReleaseInfo> GetLatestRelease(bool include_prereleases);
+ } // namespace UpdateChecker
+diff --git a/src/yuzu/main_window.cpp b/src/yuzu/main_window.cpp
+index 4aeecb9da7..bd217c2831 100644
+--- a/src/yuzu/main_window.cpp
++++ b/src/yuzu/main_window.cpp
+@@ -70,6 +70,12 @@
+ #include <QStatusBar>
+ #include <QtConcurrentRun>
+ #include <QMimeData>
++#include <QRegularExpression>
++#include <QTextBrowser>
++#include <QDialog>
++#include <QVBoxLayout>
++#include <QLabel>
++#include <QDialogButtonBox>
+ 
+ // Qt Common //
+ #include "qt_common/config/uisettings.h"
+@@ -516,19 +522,22 @@ MainWindow::MainWindow(bool has_broken_vulkan)
+ 
+ #ifdef ENABLE_UPDATE_CHECKER
+     if (UISettings::values.check_for_updates) {
+-        update_future = QtConcurrent::run([]() -> QString {
++        update_future = QtConcurrent::run([]() -> QStringList {
+             const bool is_prerelease = ((strstr(Common::g_build_version, "pre-alpha") != NULL) ||
+                                         (strstr(Common::g_build_version, "alpha") != NULL) ||
+                                         (strstr(Common::g_build_version, "beta") != NULL) ||
+                                         (strstr(Common::g_build_version, "rc") != NULL));
+-            const std::optional<std::string> latest_release_tag =
++            const std::optional<UpdateChecker::ReleaseInfo> latest_release =
+                 UpdateChecker::GetLatestRelease(is_prerelease);
+-            if (latest_release_tag && latest_release_tag.value() != Common::g_build_version) {
+-                return QString::fromStdString(latest_release_tag.value());
++            if (latest_release && latest_release->tag_name != Common::g_build_version) {
++                return QStringList{
++                    QString::fromStdString(latest_release->tag_name),
++                    QString::fromStdString(latest_release->body)
++                };
+             }
+-            return QString{};
++            return QStringList{};
+         });
+-        update_watcher.connect(&update_watcher, &QFutureWatcher<QString>::finished, this,
++        update_watcher.connect(&update_watcher, &QFutureWatcher<QStringList>::finished, this,
+                                &MainWindow::OnEmulatorUpdateAvailable);
+         update_watcher.setFuture(update_future);
+     }
+@@ -4022,19 +4031,63 @@ void MainWindow::OnCaptureScreenshot() {
+ 
+ #ifdef ENABLE_UPDATE_CHECKER
+ void MainWindow::OnEmulatorUpdateAvailable() {
+-    QString version_string = update_future.result();
+-    if (version_string.isEmpty())
++    QStringList result = update_future.result();
++
++    if (result.isEmpty())
+         return;
+ 
+-    QMessageBox update_prompt(this);
+-    update_prompt.setWindowTitle(tr("Update Available"));
+-    update_prompt.setIcon(QMessageBox::Information);
+-    update_prompt.addButton(QMessageBox::Yes);
+-    update_prompt.addButton(QMessageBox::Ignore);
+-    update_prompt.setText(
+-        tr("Download the %1 update?").arg(version_string));
+-    update_prompt.exec();
+-    if (update_prompt.button(QMessageBox::Yes) == update_prompt.clickedButton()) {
++    QString version_string = result[0];
++    QString changelog = result[1];
++
++    QDialog update_dialog(this);
++    update_dialog.setWindowTitle(tr("Update Available"));
++    update_dialog.setMinimumWidth(500);
++
++    QVBoxLayout* main_layout = new QVBoxLayout(&update_dialog);
++
++    QLabel* header_label = new QLabel(tr("New update detected: %1").arg(version_string), &update_dialog);
++    header_label->setStyleSheet(QStringLiteral("font-weight: bold; font-size: 14px;"));
++    main_layout->addWidget(header_label);
++
++    if (!changelog.isEmpty()) {
++        QString formatted_log = changelog.toHtmlEscaped();
++        QString html_changelog = changelog;
++
++        static QRegularExpression link_re(QStringLiteral(R"(\[(.*?)\]\((.*?)\))"));
++        html_changelog.replace(link_re, QStringLiteral(R"(<a href="\2">\1</a>)"));
++
++        static QRegularExpression bold_re(QStringLiteral(R"(\*\*(.*?)\*\*)"));
++        html_changelog.replace(bold_re, QStringLiteral(R"(<b>\1</b>)"));
++
++        static QRegularExpression code_re(QStringLiteral(R"(`(.*?)`)"));
++        html_changelog.replace(code_re, QStringLiteral(R"(<code>\1</code>)"));
++
++        html_changelog.replace(QStringLiteral("\n"), QStringLiteral("<br>"));
++        html_changelog.replace(QStringLiteral("- "), QStringLiteral("&bull; "));
++
++        QTextBrowser* log_view = new QTextBrowser(&update_dialog);
++        log_view->setHtml(tr("<b>Changelog:</b><br>%1").arg(html_changelog));
++        log_view->setReadOnly(true);
++
++        log_view->setOpenExternalLinks(true);
++        log_view->setTextInteractionFlags(Qt::TextBrowserInteraction);
++
++        log_view->setMinimumHeight(200);
++        log_view->setMaximumHeight(400);
++        main_layout->addWidget(log_view);
++    }
++
++    main_layout->addWidget(new QLabel(tr("Download now?"), &update_dialog));
++
++    QDialogButtonBox* button_box = new QDialogButtonBox(
++        QDialogButtonBox::Yes | QDialogButtonBox::No, &update_dialog);
++
++    connect(button_box, &QDialogButtonBox::accepted, &update_dialog, &QDialog::accept);
++    connect(button_box, &QDialogButtonBox::rejected, &update_dialog, &QDialog::reject);
++
++    main_layout->addWidget(button_box);
++
++    if (update_dialog.exec() == QDialog::Accepted) {
+         auto const full_url = fmt::format("{}/{}/releases/tag/",
+                                           std::string{Common::g_build_auto_update_website},
+                                           std::string{Common::g_build_auto_update_repo}
+diff --git a/src/yuzu/main_window.h b/src/yuzu/main_window.h
+index 76ad165551..abbf677299 100644
+--- a/src/yuzu/main_window.h
++++ b/src/yuzu/main_window.h
+@@ -471,8 +471,8 @@ private:
+     std::shared_ptr<InputCommon::InputSubsystem> input_subsystem;
+ 
+ #ifdef ENABLE_UPDATE_CHECKER
+-    QFuture<QString> update_future;
+-    QFutureWatcher<QString> update_watcher;
++    QFuture<QStringList> update_future;
++    QFutureWatcher<QStringList> update_watcher;
+ #endif
+ 
+     MultiplayerState* multiplayer_state = nullptr;

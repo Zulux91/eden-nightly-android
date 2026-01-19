@@ -14,6 +14,8 @@ echo "   APK name: $APK_NAME"
 # hook the updater to check my repo
 echo "-- Applying updater patch..."
 git apply ../patches/update.patch
+# display changelog
+git apply ../patches/changelog.patch
 echo "   Done."
 
 # hook apk fetcher and installer
