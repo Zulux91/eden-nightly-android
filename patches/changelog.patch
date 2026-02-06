@@ -1,5 +1,20 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 147d175989..9220f5c909 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -605,6 +605,10 @@ if (ENABLE_QT)
+         find_package(Qt6 REQUIRED COMPONENTS Multimedia)
+     endif()
+ 
++    if (ENABLE_UPDATE_CHECKER)
++        find_package(Qt6 REQUIRED COMPONENTS Network)
++    endif()
++
+     if (PLATFORM_LINUX OR PLATFORM_FREEBSD)
+         # yes Qt, we get it
+         set(QT_NO_PRIVATE_MODULE_WARNING ON)
 diff --git a/src/android/app/src/main/java/org/yuzu/yuzu_emu/ui/main/MainActivity.kt b/src/android/app/src/main/java/org/yuzu/yuzu_emu/ui/main/MainActivity.kt
-index 23716ac5a5..11257f2f46 100644
+index 23716ac5a5..4e6855ef43 100644
 --- a/src/android/app/src/main/java/org/yuzu/yuzu_emu/ui/main/MainActivity.kt
 +++ b/src/android/app/src/main/java/org/yuzu/yuzu_emu/ui/main/MainActivity.kt
 @@ -180,19 +180,57 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
@@ -35,12 +50,12 @@ index 23716ac5a5..11257f2f46 100644
 +            .replace("'", "&#39;")
 +
 +            val formattedLog = escapedLog
-+                .replace(Regex("^\\s*[-*]\\s+", RegexOption.MULTILINE), "• ")
-+                .replace(Regex("^\\s{2,}[-*]\\s+", RegexOption.MULTILINE), "&nbsp;&nbsp;&nbsp;&nbsp;• ")
 +                .replace(Regex("\\[(.*?)\\]\\((.*?)\\)"), "<a href=\"$2\">$1</a>")
 +                .replace(Regex("\\*\\*(.*?)\\*\\*"), "<b>$1</b>")
 +                .replace(Regex("`(.*?)`"), "<font color='#FF4081'><tt>$1</tt></font>")
++                .replace("- Merged commit:", "• Merged commit:")
 +                .replace("\n", "<br>")
++                .replace(Regex("^<br>+"), "")
 +
 +            val description = getString(R.string.update_available_description, version)
 +            val fullContent = "<b>$description</b><br><br><b>Changelog:</b><br>$formattedLog"
@@ -85,20 +100,54 @@ index 5746659b68..aaf5e1350e 100644
      }
      return nullptr;
  }
+diff --git a/src/frontend_common/CMakeLists.txt b/src/frontend_common/CMakeLists.txt
+index b8a282b234..2170394298 100644
+--- a/src/frontend_common/CMakeLists.txt
++++ b/src/frontend_common/CMakeLists.txt
+@@ -17,6 +17,16 @@ add_library(frontend_common STATIC
+ if (ENABLE_UPDATE_CHECKER)
+     target_link_libraries(frontend_common PRIVATE httplib::httplib)
+     target_link_libraries(frontend_common PRIVATE nlohmann_json::nlohmann_json)
++
++    if (ENABLE_QT)
++        target_link_libraries(frontend_common PRIVATE Qt6::Network Qt6::Core)
++        set_target_properties(frontend_common PROPERTIES AUTOMOC ON)
++
++        if (WIN32 AND NOT MSVC)
++        target_link_libraries(frontend_common PRIVATE brotlidec brotlicommon)
++        endif()
++    endif()
++
+     target_sources(frontend_common PRIVATE
+         update_checker.cpp
+         update_checker.h)
 diff --git a/src/frontend_common/update_checker.cpp b/src/frontend_common/update_checker.cpp
-index 9a8143c788..d0814e4418 100644
+index 9a8143c788..b29e05bacf 100644
 --- a/src/frontend_common/update_checker.cpp
 +++ b/src/frontend_common/update_checker.cpp
-@@ -78,7 +78,7 @@ std::optional<std::string> UpdateChecker::GetResponse(std::string url, std::stri
+@@ -19,6 +19,12 @@
+ #include <nlohmann/json.hpp>
+ #include <optional>
+ #include <string>
++#include <algorithm>
++
++#ifndef ANDROID
++#include <QFile>
++#include <QNetworkRequest>
++#endif
+ 
+ std::optional<std::string> UpdateChecker::GetResponse(std::string url, std::string path)
+ {
+@@ -78,7 +84,7 @@ std::optional<std::string> UpdateChecker::GetResponse(std::string url, std::stri
      }
  }
  
 -std::optional<std::string> UpdateChecker::GetLatestRelease(bool include_prereleases) {
-+std::optional<UpdateChecker::ReleaseInfo> UpdateChecker::GetLatestRelease(bool include_prereleases) {
++std::optional<UpdateChecker::ReleaseInfo> UpdateChecker::GetLatestRelease(bool include_prereleases, const std::string& current_name) {
      const auto update_check_url = std::string{Common::g_build_auto_update_api};
      std::string update_check_path = fmt::format("/repos/{}",
                                                  std::string{Common::g_build_auto_update_repo});
-@@ -103,9 +103,12 @@ std::optional<std::string> UpdateChecker::GetLatestRelease(bool include_prerelea
+@@ -103,9 +109,12 @@ std::optional<std::string> UpdateChecker::GetLatestRelease(bool include_prerelea
              // If there is a newer tag, but that tag has no associated release, don't prompt the
              // user to update.
              if (!latest_tag_has_release)
@@ -113,13 +162,17 @@ index 9a8143c788..d0814e4418 100644
          } else { // This is a stable release, only check for other stable releases.
              update_check_path += "/releases/latest";
              const auto response = UpdateChecker::GetResponse(update_check_url, update_check_path);
-@@ -113,8 +116,32 @@ std::optional<std::string> UpdateChecker::GetLatestRelease(bool include_prerelea
+@@ -113,10 +122,108 @@ std::optional<std::string> UpdateChecker::GetLatestRelease(bool include_prerelea
              if (!response)
                  return {};
  
 -            const std::string latest_tag = nlohmann::json::parse(response.value()).at("tag_name");
 -            return latest_tag;
+-        }
 +            auto json = nlohmann::json::parse(response.value());
++            ReleaseInfo info;
++            info.tag_name = json.at("tag_name").get<std::string>();
++
 +            std::string full_body = json.value("body", "");
 +            std::string extracted_changelog = "";
 +
@@ -141,48 +194,279 @@ index 9a8143c788..d0814e4418 100644
 +            }
 +            extracted_changelog.erase(extracted_changelog.find_last_not_of(" \n\r\t") + 1);
 +
-+            return ReleaseInfo{
-+                json.at("tag_name").get<std::string>(),
-+                extracted_changelog
-+            };
-         }
++            info.body = extracted_changelog;
++
++            if (json.contains("assets") && json["assets"].is_array()) {
++                auto filter_assets = [&](bool precise_mode) {
++                    for (const auto& asset : json["assets"]) {
++                        std::string name = asset.value("name", "");
++                        std::string url = asset.value("browser_download_url", "");
++                        bool match = false;
++#ifdef _WIN32
++                        if (name.find("Windows") != std::string::npos) {
++                            match = true;
++
++                            if (precise_mode && !current_name.empty()) {
++                                const std::vector<std::string> toolchains = {"MSVC", "Clang", "MSYS2"};
++                                for (const auto& tc : toolchains) {
++                                    if (current_name.find(tc) != std::string::npos && name.find(tc) == std::string::npos) {
++                                        match = false;
++                                        break;
++                                    }
++                                }
  
++                                if (match) {
++                                    if (current_name.find("arm64") != std::string::npos && name.find("arm64") == std::string::npos) match = false;
++                                    if (current_name.find("x86_64") != std::string::npos && name.find("x86_64") == std::string::npos) match = false;
++                                }
++                            }
++                        }
++#elif defined(__apple__)
++                        if (name.find("MacOS") != std::string::npos) match = true;
++#elif defined(__FreeBSD__)
++                        if (name.find("FreeBSD") != std::string::npos) match = true;
++#else
++                        bool is_appimage = (name.find(".AppImage") != std::string::npos);
++                        bool is_appbundle = (name.find(".AppBundle") != std::string::npos);
++
++                        if (is_appimage || is_appbundle) {
++                            match = true;
++
++                            if (precise_mode && !current_name.empty()) {
++                                std::string current_name_lower = current_name;
++                                std::transform(current_name_lower.begin(), current_name_lower.end(), current_name_lower.begin(), ::tolower);
++
++                                std::string asset_name_lower = name;
++                                std::transform(asset_name_lower.begin(), asset_name_lower.end(), asset_name_lower.begin(), ::tolower);
++
++                                const std::vector<std::string> features = {
++                                        ".appimage", ".appbundle",
++                                        "steamdeck", "rog_ally", "legacy", "common", "linux",
++                                        "pgo", "normal",
++                                        "aarch64", "x86_64"
++                                };
++
++                                for (const auto& f : features) {
++                                    bool cur_has = (current_name_lower.find(f) != std::string::npos);
++                                    bool asset_has = (asset_name_lower.find(f) != std::string::npos);
++
++                                    if (cur_has != asset_has) {
++                                        match = false;
++                                        break;
++                                    }
++                                }
++                            }
++                        }
++#endif
++                        if (match) {
++                        info.assets.push_back({name, url});
++                        }
++                    }
++                };
++                filter_assets(true);
++
++                if (info.assets.empty()) {
++                    filter_assets(false);
++                }
++            }
++            return info;
++        }
      } catch (nlohmann::detail::out_of_range &) {
+         LOG_ERROR(Frontend,
+                   "Parsing JSON response from {}{} failed during update check: "
+@@ -133,3 +240,76 @@ std::optional<std::string> UpdateChecker::GetLatestRelease(bool include_prerelea
+         return {};
+     }
+ }
++
++#ifndef ANDROID
++namespace UpdateChecker {
++UpdateChecker::UpdateDownloader::UpdateDownloader(QObject* parent)
++    : QObject(parent), manager(new QNetworkAccessManager(this)), file(nullptr), aborted(false) {}
++
++void UpdateDownloader::startDownload(const QUrl& url, const QString& savePath) {
++    file = new QFile(savePath);
++    if (!file->open(QIODevice::WriteOnly)) {
++        emit downloadFinished(false, file->errorString());
++        return;
++    }
++    QNetworkRequest request(url);
++    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
++    reply = manager->get(request);
++    connect(reply, &QNetworkReply::downloadProgress, this, &UpdateDownloader::onDownloadProgress);
++    connect(reply, &QNetworkReply::readyRead, this, &UpdateDownloader::onReadyRead);
++    connect(reply, &QNetworkReply::finished, this, &UpdateDownloader::onReplyFinished);
++}
++
++void UpdateDownloader::cancel() {
++    if (aborted) return;
++    aborted = true;
++
++    if (reply && reply->isRunning()) {
++        disconnect(reply, &QNetworkReply::downloadProgress, this, nullptr);
++        reply->abort();
++    }
++}
++
++void UpdateDownloader::onDownloadProgress(qint64 recv, qint64 total) { if (!aborted) emit progressChanged(recv, total); }
++void UpdateDownloader::onReadyRead() { if (!aborted && file && reply) file->write(reply->readAll()); }
++
++void UpdateDownloader::onReplyFinished() {
++    if (file && file->isOpen()) {
++        file->flush();
++        file->close();
++    }
++
++    bool is_canceled = (aborted || (reply && reply->error() == QNetworkReply::OperationCanceledError));
++    bool is_error = (reply && reply->error() != QNetworkReply::NoError && !is_canceled);
++
++    if (is_canceled) {
++        if (file) file->remove();
++        emit downloadFinished(false, tr("Download canceled."));
++    } else if (is_error) {
++        if (file) file->remove();
++        emit downloadFinished(false, reply->errorString());
++    } else {
++        emit downloadFinished(true, "");
++    }
++
++    if (reply) {
++        reply->deleteLater();
++        reply = nullptr;
++    }
++}
++
++UpdateDownloader::~UpdateDownloader() {
++    if (reply) {
++        reply->abort();
++    }
++
++    if (file) {
++        if (file->isOpen()) {
++            file->close();
++        }
++        delete file;
++        file = nullptr;
++    }
++}
++} // namespace UpdateChecker
++#endif
 diff --git a/src/frontend_common/update_checker.h b/src/frontend_common/update_checker.h
-index 957843bee0..dad3221fdf 100644
+index 957843bee0..b8f6a46cff 100644
 --- a/src/frontend_common/update_checker.h
 +++ b/src/frontend_common/update_checker.h
-@@ -11,6 +11,11 @@
+@@ -9,8 +9,56 @@
+ 
+ #include <optional>
  #include <string>
++#include <vector>
++
++#ifndef ANDROID
++#include <QObject>
++#include <QString>
++#include <QUrl>
++#include <QPointer>
++#include <QFile>
++#include <QtNetwork/QNetworkAccessManager>
++#include <QtNetwork/QNetworkReply>
++#endif
  
  namespace UpdateChecker {
++struct Asset {
++    std::string name;
++    std::string url;
++};
 +struct ReleaseInfo {
 +    std::string tag_name;
 +    std::string body;
++    std::vector<Asset> assets;
 +};
++
++#ifndef ANDROID
++class UpdateDownloader : public QObject {
++    Q_OBJECT
++public:
++    explicit UpdateDownloader(QObject* parent = nullptr);
++    ~UpdateDownloader() override;
++    void startDownload(const QUrl& url, const QString& savePath);
++    void cancel();
++
++signals:
++    void progressChanged(qint64 bytesReceived, qint64 bytesTotal);
++    void downloadFinished(bool success, const QString& errorMsg);
++
++private slots:
++    void onDownloadProgress(qint64 bytesReceived, qint64 bytesTotal);
++    void onReadyRead();
++    void onReplyFinished();
++
++private:
++    QNetworkAccessManager* manager;
++    QPointer<QNetworkReply> reply;
++    QFile* file;
++    bool aborted{false};
++};
++#endif
 +
  std::optional<std::string> GetResponse(std::string url, std::string path);
 -std::optional<std::string> GetLatestRelease(bool include_prereleases);
-+std::optional<ReleaseInfo> GetLatestRelease(bool include_prereleases);
++std::optional<ReleaseInfo> GetLatestRelease(bool include_prereleases, const std::string& current_name = "");
++
  } // namespace UpdateChecker
+diff --git a/src/yuzu/CMakeLists.txt b/src/yuzu/CMakeLists.txt
+index 35c6f80e40..a3384605fe 100644
+--- a/src/yuzu/CMakeLists.txt
++++ b/src/yuzu/CMakeLists.txt
+@@ -391,7 +391,7 @@ elseif(WIN32)
+ endif()
+ 
+ target_link_libraries(yuzu PRIVATE nlohmann_json::nlohmann_json)
+-target_link_libraries(yuzu PRIVATE common core input_common frontend_common network video_core qt_common)
++target_link_libraries(yuzu PRIVATE common core input_common frontend_common network video_core qt_common QuaZip::QuaZip)
+ target_link_libraries(yuzu PRIVATE Boost::headers glad Qt6::Widgets Qt6::Concurrent)
+ target_link_libraries(yuzu PRIVATE ${PLATFORM_LIBRARIES} Threads::Threads)
+ 
 diff --git a/src/yuzu/main_window.cpp b/src/yuzu/main_window.cpp
-index 4aeecb9da7..bd217c2831 100644
+index d44cc6f731..e4a1eeb732 100644
 --- a/src/yuzu/main_window.cpp
 +++ b/src/yuzu/main_window.cpp
-@@ -70,6 +70,12 @@
+@@ -58,18 +58,26 @@
+ #include <QCheckBox>
+ #include <QClipboard>
+ #include <QDesktopServices>
++#include <QDialog>
++#include <QDialogButtonBox>
+ #include <QDir>
+ #include <QFileDialog>
+ #include <QFileInfo>
+ #include <QGuiApplication>
+ #include <QInputDialog>
++#include <QLabel>
++#include <QMessageBox>
++#include <QMimeData>
+ #include <QPalette>
+ #include <QProgressDialog>
++#include <QRegularExpression>
+ #include <QScreen>
+ #include <QShortcut>
++#include <QStandardPaths>
  #include <QStatusBar>
  #include <QtConcurrentRun>
- #include <QMimeData>
-+#include <QRegularExpression>
+-#include <QMimeData>
 +#include <QTextBrowser>
-+#include <QDialog>
 +#include <QVBoxLayout>
-+#include <QLabel>
-+#include <QDialogButtonBox>
  
  // Qt Common //
  #include "qt_common/config/uisettings.h"
-@@ -516,19 +522,22 @@ MainWindow::MainWindow(bool has_broken_vulkan)
+@@ -83,6 +91,7 @@
+ #include "qt_common/util/meta.h"
+ #include "qt_common/util/content.h"
+ #include "qt_common/util/fs.h"
++#include "JlCompress.h"
+ 
+ // These are wrappers to avoid the calls to CreateDirectory and CreateFile because of the Windows
+ // defines.
+@@ -516,19 +525,41 @@ MainWindow::MainWindow(bool has_broken_vulkan)
  
  #ifdef ENABLE_UPDATE_CHECKER
      if (UISettings::values.check_for_updates) {
@@ -193,46 +477,64 @@ index 4aeecb9da7..bd217c2831 100644
                                          (strstr(Common::g_build_version, "beta") != NULL) ||
                                          (strstr(Common::g_build_version, "rc") != NULL));
 -            const std::optional<std::string> latest_release_tag =
-+            const std::optional<UpdateChecker::ReleaseInfo> latest_release =
-                 UpdateChecker::GetLatestRelease(is_prerelease);
+-                UpdateChecker::GetLatestRelease(is_prerelease);
 -            if (latest_release_tag && latest_release_tag.value() != Common::g_build_version) {
 -                return QString::fromStdString(latest_release_tag.value());
-+            if (latest_release && latest_release->tag_name != Common::g_build_version) {
-+                return QStringList{
-+                    QString::fromStdString(latest_release->tag_name),
-+                    QString::fromStdString(latest_release->body)
-+                };
++
++            QString app_path;
++#ifdef Q_OS_LINUX
++            QByteArray appimage_env = qgetenv("APPIMAGE");
++            if (!appimage_env.isEmpty()) {
++                app_path = QString::fromLocal8Bit(appimage_env);
++            }else {
++                app_path = QCoreApplication::applicationFilePath();
              }
 -            return QString{};
-+            return QStringList{};
++#else
++            app_path = QCoreApplication::applicationFilePath();
++#endif
++            std::string current_name = app_path.toStdString();
++            const std::optional<UpdateChecker::ReleaseInfo> latest_release =
++                UpdateChecker::GetLatestRelease(is_prerelease, current_name);
++
++            if (latest_release && latest_release->tag_name != Common::g_build_version) {
++                QStringList list;
++                list << QString::fromStdString(latest_release->tag_name);
++                list << QString::fromStdString(latest_release->body);
++
++                for (const auto& asset : latest_release->assets) {
++                    list << QString::fromStdString(asset.name);
++                    list << QString::fromStdString(asset.url);
++                }
++                return list;
++            }
++            return QStringList();
          });
 -        update_watcher.connect(&update_watcher, &QFutureWatcher<QString>::finished, this,
 +        update_watcher.connect(&update_watcher, &QFutureWatcher<QStringList>::finished, this,
                                 &MainWindow::OnEmulatorUpdateAvailable);
          update_watcher.setFuture(update_future);
      }
-@@ -4022,19 +4031,63 @@ void MainWindow::OnCaptureScreenshot() {
+@@ -4022,24 +4053,154 @@ void MainWindow::OnCaptureScreenshot() {
  
  #ifdef ENABLE_UPDATE_CHECKER
  void MainWindow::OnEmulatorUpdateAvailable() {
 -    QString version_string = update_future.result();
 -    if (version_string.isEmpty())
+-        return;
 +    QStringList result = update_future.result();
 +
-+    if (result.isEmpty())
-         return;
- 
--    QMessageBox update_prompt(this);
--    update_prompt.setWindowTitle(tr("Update Available"));
--    update_prompt.setIcon(QMessageBox::Information);
--    update_prompt.addButton(QMessageBox::Yes);
--    update_prompt.addButton(QMessageBox::Ignore);
--    update_prompt.setText(
--        tr("Download the %1 update?").arg(version_string));
--    update_prompt.exec();
--    if (update_prompt.button(QMessageBox::Yes) == update_prompt.clickedButton()) {
++    if (result.size() < 2) return;
++
 +    QString version_string = result[0];
 +    QString changelog = result[1];
++
++    QStringList asset_names;
++    QMap<QString, QString> url_map;
++    for (int i = 2; i < result.size(); i += 2) {
++        asset_names << result[i];
++        url_map[result[i]] = result[i+1];
++    }
 +
 +    QDialog update_dialog(this);
 +    update_dialog.setWindowTitle(tr("Update Available"));
@@ -245,8 +547,10 @@ index 4aeecb9da7..bd217c2831 100644
 +    main_layout->addWidget(header_label);
 +
 +    if (!changelog.isEmpty()) {
-+        QString formatted_log = changelog.toHtmlEscaped();
-+        QString html_changelog = changelog;
++        QString html_changelog = changelog.toHtmlEscaped();
++
++        html_changelog.replace(QStringLiteral("- Merged commit:"),
++                       QStringLiteral("&bull; Merged commit:"));
 +
 +        static QRegularExpression link_re(QStringLiteral(R"(\[(.*?)\]\((.*?)\))"));
 +        html_changelog.replace(link_re, QStringLiteral(R"(<a href="\2">\1</a>)"));
@@ -258,9 +562,13 @@ index 4aeecb9da7..bd217c2831 100644
 +        html_changelog.replace(code_re, QStringLiteral(R"(<code>\1</code>)"));
 +
 +        html_changelog.replace(QStringLiteral("\n"), QStringLiteral("<br>"));
-+        html_changelog.replace(QStringLiteral("- "), QStringLiteral("&bull; "));
++
++        if (html_changelog.startsWith(QLatin1String("<br><br>"))) {
++            html_changelog.remove(0, 8);
++        }
 +
 +        QTextBrowser* log_view = new QTextBrowser(&update_dialog);
++
 +        log_view->setHtml(tr("<b>Changelog:</b><br>%1").arg(html_changelog));
 +        log_view->setReadOnly(true);
 +
@@ -268,10 +576,20 @@ index 4aeecb9da7..bd217c2831 100644
 +        log_view->setTextInteractionFlags(Qt::TextBrowserInteraction);
 +
 +        log_view->setMinimumHeight(200);
-+        log_view->setMaximumHeight(400);
++        log_view->setMaximumHeight(500);
 +        main_layout->addWidget(log_view);
 +    }
-+
+ 
+-    QMessageBox update_prompt(this);
+-    update_prompt.setWindowTitle(tr("Update Available"));
+-    update_prompt.setIcon(QMessageBox::Information);
+-    update_prompt.addButton(QMessageBox::Yes);
+-    update_prompt.addButton(QMessageBox::Ignore);
+-    update_prompt.setText(
+-        tr("Download the %1 update?").arg(version_string));
+-    update_prompt.exec();
+-    if (update_prompt.button(QMessageBox::Yes) == update_prompt.clickedButton()) {
+-        auto const full_url = fmt::format("{}/{}/releases/tag/",
 +    main_layout->addWidget(new QLabel(tr("Download now?"), &update_dialog));
 +
 +    QDialogButtonBox* button_box = new QDialogButtonBox(
@@ -283,11 +601,91 @@ index 4aeecb9da7..bd217c2831 100644
 +    main_layout->addWidget(button_box);
 +
 +    if (update_dialog.exec() == QDialog::Accepted) {
-         auto const full_url = fmt::format("{}/{}/releases/tag/",
++        QString selected_url;
++        QString fileName;
++
++        if (asset_names.isEmpty()) {
++            auto const full_url = fmt::format("{}/{}/releases/tag/",
                                            std::string{Common::g_build_auto_update_website},
                                            std::string{Common::g_build_auto_update_repo}
+                                           );
+-        QDesktopServices::openUrl(QUrl(QString::fromStdString(full_url) + version_string));
++            QDesktopServices::openUrl(QUrl(QString::fromStdString(full_url) + version_string));
++            return;
++        } else if (asset_names.size() == 1) {
++            fileName = asset_names[0];
++            selected_url = url_map[fileName];
++        } else {
++            bool ok;
++            fileName = QInputDialog::getItem(this, tr("Select Build"),
++                                                 tr("Multiple builds found for your platform.\n"
++                                                    "Please select the one that matches your system:"),
++                                                 asset_names, 0, false, &ok);
++            if (!ok || fileName.isEmpty()) return;
++            selected_url = url_map[fileName];
++        }
++
++        QString save_dir;
++#ifdef _WIN32
++        save_dir = QCoreApplication::applicationDirPath();
++#else
++        save_dir = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
++        if (save_dir.isEmpty()) {
++            save_dir = QDir::homePath();
++        }
++#endif
++        QString save_path = QDir(save_dir).filePath(fileName);
++
++        QProgressDialog* progress = new QProgressDialog(this);
++        progress->setWindowModality(Qt::WindowModal);
++        progress->setWindowTitle(tr("Downloading..."));
++        progress->setLabelText(fileName);
++        progress->setCancelButtonText(tr("Cancel"));
++        progress->setRange(0, 100);
++        progress->show();
++
++        auto* downloader = new UpdateChecker::UpdateDownloader(this);
++
++        connect(downloader, &UpdateChecker::UpdateDownloader::progressChanged, this, [progress](qint64 r, qint64 t){
++            if (t > 0) {
++                progress->setValue(static_cast<int>((r * 100) / t));
++            }
++        });
++
++        connect(downloader, &UpdateChecker::UpdateDownloader::downloadFinished, this, [this, progress, save_path, downloader](bool success, QString msg){
++            progress->hide();
++            if (success) {
++                if (save_path.endsWith(QLatin1String(".zip"), Qt::CaseInsensitive)) {
++                    QString extract_path = QCoreApplication::applicationDirPath();
++                    QStringList extractedFiles = JlCompress::extractDir(save_path, extract_path);
++
++                    if (!extractedFiles.isEmpty()) {
++                        QMessageBox::information(this, tr("Success"), tr("Update downloaded and extracted."));
++
++                        QFile::remove(save_path);
++                    } else {
++                        QMessageBox::warning(this, tr("Failed"), tr("Failed to extract the update package."));
++                    }
++                }
++                else {
++                    QMessageBox::information(this, tr("Success"), tr("Update downloaded to:\n%1").arg(save_path));
++                    QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(save_path).absolutePath()));
++                }
++            } else {
++                QMessageBox::information(this, tr("Update"), msg);
++            }
++            progress->deleteLater();
++            downloader->deleteLater();
++        });
++
++        connect(progress, &QProgressDialog::canceled, downloader, &UpdateChecker::UpdateDownloader::cancel);
++
++        downloader->startDownload(QUrl(selected_url), save_path);
+     }
+ }
+ #endif
 diff --git a/src/yuzu/main_window.h b/src/yuzu/main_window.h
-index 76ad165551..abbf677299 100644
+index fe91ea18f1..c0fc8dba3d 100644
 --- a/src/yuzu/main_window.h
 +++ b/src/yuzu/main_window.h
 @@ -471,8 +471,8 @@ private:
